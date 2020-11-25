@@ -11,7 +11,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"hpc_exporter/pbs"
-	"hpc_exporter/torque"
+//	"hpc_exporter/torque"
 )
 
 var (
@@ -39,6 +39,16 @@ var (
 		"ssh-password",
 		"",
 		"SSH password for remote frontend connection (no localhost).",
+	)
+	sshPrivKey = flag.String(
+		"ssh-private-key",
+		"~/.ssh/id_rsa",
+		"SSH private key recognised by the remote frontend",
+	)
+	sshKnownHosts = flag.String(
+		"ssh-known-hosts",
+		"~/.ssh/known_hosts",
+		"SSH local known_hosts file including the remote frontend",
 	)
 	countryTZ = flag.String(
 		"countrytz",
@@ -82,12 +92,14 @@ func main() {
 
 //	prometheus.MustRegister(NewerTorqueCollector(*host, *sshUser, *sshPass, *countryTZ))
 	switch sched := *scheduler; sched {
+/*
         case "torque":
 		log.Debugf("Registering collector for scheduler %s", sched)
 		prometheus.MustRegister(torque.NewerTorqueCollector(*host, *sshUser, *sshPass, *countryTZ))
+*/
         case "pbs":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshPass, *countryTZ))
+		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshPass, *sshPrivKey, *sshKnownHosts, *countryTZ))
         default:
                 os.Exit(-1)
         }

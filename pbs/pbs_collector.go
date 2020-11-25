@@ -104,7 +104,7 @@ type PBSCollector struct {
 // 	return newPBSCollector
 // }
 
-func NewerPBSCollector(host, sshUser, sshPass, timeZone string) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZone string) *PBSCollector {
 	newerPBSCollector := &PBSCollector{
 		queueRunning: prometheus.NewDesc(
 			"te_showq_r",
@@ -152,6 +152,8 @@ func NewerPBSCollector(host, sshUser, sshPass, timeZone string) *PBSCollector {
 			sshUser,
 			host,
 			22,
+			sshPrivKey,
+			sshKnownHosts,
 		),
 		sshClient:         nil,
 		alreadyRegistered: make([]string, 0),
