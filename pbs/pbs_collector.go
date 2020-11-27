@@ -17,95 +17,61 @@ import (
 
 const (
 	sCOMPLETED	= iota
-	sEXITING	= iota
-	sHELD		= iota
+	sEXITING		= iota
+	sHELD			= iota
 	sQUEUED		= iota
-	sRUNNING	= iota
+	sRUNNING		= iota
 	sMOVING		= iota
-	sWAITING	= iota
+	sWAITING		= iota
 	sSUSPENDED	= iota
 )
 
 /*
-from man qstat:
- -  the job state:
-       C -  Job is completed after having run.
-       E -  Job is exiting after having run.
-       H -  Job is held.
-       Q -  job is queued, eligible to run or routed.
-       R -  job is running.
-       T -  job is being moved to new location.
-       W -  job is waiting for its execution time
-            (-a option) to be reached.
-       S -  (Unicos only) job is suspend.
+	from man qstat:
+	-  the job state:
+		C -  Job is completed after having run.
+		E -  Job is exiting after having run.
+		H -  Job is held.
+		Q -  job is queued, eligible to run or routed.
+		R -  job is running.
+		T -  job is being moved to new location.
+		W -  job is waiting for its execution time (-a option) to be reached.
+		S -  (Unicos only) job is suspend.
 */
 
 // StatusDict maps string status with its int values
 var StatusDict = map[string]int{
-	"C":    sCOMPLETED,
+	"C":	sCOMPLETED,
 	"E":	sEXITING,
 	"H":	sHELD,
 	"Q":	sQUEUED,
-	"R":    sRUNNING,
-	"T":    sMOVING,
-	"W":    sWAITING,
-	"S":    sSUSPENDED,
+	"R":	sRUNNING,
+	"T":	sMOVING,
+	"W":	sWAITING,
+	"S":	sSUSPENDED,
 }
 
+type CollectFunc 		func(ch chan<- prometheus.Metric)
+
+type jobDetailsMap	map[string](string)
+
 type PBSCollector struct {
-	// waitTime          *prometheus.Desc
-	// status            *prometheus.Desc
-	queueRunning      *prometheus.Desc
-	userJobs          *prometheus.Desc
-	// jobDetails        *prometheus.Desc
-	partitionNodes    *prometheus.Desc
+	
+	descPtrMap			map[string](*prometheus.Desc)
+		
 	sshConfig         *ssh.SSHConfig
 	sshClient         *ssh.SSHClient
 	timeZone          *time.Location
 	alreadyRegistered []string
 	lasttime          time.Time
+	
+	jobsMap				map[string](jobDetailsMap)
 }
 
-// func NewPBSCollector(host, sshUser, sshPass, timeZone string) *PBSCollector {
-// 	newPBSCollector := &PBSCollector{
-// 		waitTime: prometheus.NewDesc(
-// 			"job_wait_time",
-// 			"Time that the job waited, or is estimated to wait",
-// 			[]string{"jobid", "name", "username", "partition", "numcpus", "state"},
-// 			nil,
-// 		),
-// 		status: prometheus.NewDesc(
-// 			"job_status",
-// 			"Status of the job",
-// 			[]string{"jobid", "name", "username", "partition"},
-// 			nil,
-// 		),
-// 		partitionNodes: prometheus.NewDesc(
-// 			"partition_nodes",
-// 			"Nodes of the partition",
-// 			[]string{"partition", "availability", "state"},
-// 			nil,
-// 		),
-// 		sshConfig: ssh.NewSSHConfigByPassword(
-// 			sshUser,
-// 			sshPass,
-// 			host,
-// 			22,
-// 		),
-// 		sshClient:         nil,
-// 		alreadyRegistered: make([]string, 0),
-// 	}
-// 	var err error
-// 	newPBSCollector.timeZone, err = time.LoadLocation(timeZone)
-// 	if err != nil {
-// 		log.Fatalln(err.Error())
-// 	}
-// 	newPBSCollector.setLastTime()
-// 	return newPBSCollector
-// }
-
 func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZone string) *PBSCollector {
-	newerPBSCollector := &PBSCollector{
+	newerPBSCollector := &PBSCollector{	
+		descPtrMap: make(map[string](*prometheus.Desc)),
+		/*
 		queueRunning: prometheus.NewDesc(
 			"te_showq_r",
 			"torque's queue",
@@ -118,6 +84,7 @@ func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZo
 			[]string{"jobid", "username", "jobname", "status"},
 			nil,
 		),
+		*/
 		// jobDetails: prometheus.NewDesc(
 		// 	"te_qstat_f",
 		// 	"job details",
@@ -134,12 +101,15 @@ func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZo
 		// 			 "submit_args"},
 		// 	nil,
 		// ),
+		/*
 		partitionNodes: prometheus.NewDesc(
 			"te_qstat_f",
 			"job details",
 			[]string{"partition", "availability", "state"},
 			nil,
 		),
+		*/
+
 		/*
 		sshConfig: ssh.NewSSHConfigByPassword(
 			sshUser,
@@ -158,6 +128,48 @@ func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZo
 		sshClient:         nil,
 		alreadyRegistered: make([]string, 0),
 	}
+	
+/*
+	newerPBSCollector.descPtrMap["queueRunning"] = prometheus.NewDesc(
+		"te_showq_r",
+		"torque's queue",
+		[]string{"jobid", "state", "username", "remaining", "starttime"},
+		nil,
+	)
+*/
+	
+	newerPBSCollector.descPtrMap["userJobs"] = prometheus.NewDesc(
+		"te_qstat_u",
+		"user's jobs",
+		[]string{"jobid", "username", "jobname", "status"},
+		nil,
+	)
+	
+	newerPBSCollector.descPtrMap["jobDetails"] = prometheus.NewDesc(
+		"te_qstat_f",
+		"job details",
+		[]string{"job_name",
+					"job_owner",
+					"job_state",
+					"ctime",
+					"mtime",
+					"output_path",
+					"qtime",
+					"euser",
+					"queue_type",
+					"etime",
+					"submit_args"},
+		nil,	
+	)
+
+/*	
+	newerPBSCollector.descPtrMap["partitionNodes"] = prometheus.NewDesc(
+		"te_qstat_f",
+		"job details",
+		[]string{"partition", "availability", "state"},
+		nil,
+	)		
+*/
 	var err error
 	newerPBSCollector.timeZone, err = time.LoadLocation(timeZone)
 	if err != nil {
@@ -167,16 +179,12 @@ func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZo
 	return newerPBSCollector
 }
 
-// Describe sends metrics descriptions of this collector
-// through the ch channel.
+// Describe sends metrics descriptions of this collector through the ch channel.
 // It implements collector interface
 func (sc *PBSCollector) Describe(ch chan<- *prometheus.Desc) {
-	// ch <- sc.waitTime
-	// ch <- sc.status
-	ch <- sc.queueRunning
-	ch <- sc.userJobs
-	// ch <- sc.jobDetails
-	ch <- sc.partitionNodes
+	for _, element := range sc.descPtrMap {
+		ch <- element
+   }
 }
 
 // Collect read the values of the metrics and
@@ -189,9 +197,9 @@ func (sc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("Creating SSH client: %s", err.Error())
 		return
 	}
-
+	
 	sc.collectQstat(ch)
-	sc.collectQueue(ch)
+	// sc.collectQueue(ch)
 	// sc.collectInfo(ch)
 
 	err = sc.sshClient.Close()
@@ -211,8 +219,10 @@ func (sc *PBSCollector) executeSSHCommand(cmd string) (*ssh.SSHSession, error) {
 	if err == nil {
 		err = session.RunCommand(command)
 		return session, err
+	} else {
+		log.Errorf("Opening SSH session: %s", err.Error())
+		return nil, err
 	}
-	return nil, err
 }
 
 func (sc *PBSCollector) setLastTime() {

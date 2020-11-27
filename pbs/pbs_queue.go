@@ -144,7 +144,7 @@ func (sc *PBSCollector) collectQueue(ch chan<- prometheus.Metric) {
 			if lastJob != fields[qJOBID] {
 				ch <- prometheus.MustNewConstMetric(
 					// sc.status,
-					sc.queueRunning,
+					sc.descPtrMap["queueRunning"],
 					prometheus.GaugeValue,
 					float64(status),
 //					fields[qJOBID], fields[qNAME], fields[qUSERNAME], fields[qPARTITION],
