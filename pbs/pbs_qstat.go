@@ -24,7 +24,7 @@ const (
 	aFIELDS    = iota
 )
 
-func (sc *PBSCollector) collectJobQstat(jobid string) {
+func (sc *PBSCollector) collectJobQstat(jobid string) jobDetailsMap {
 
 	jobDetails := make(jobDetailsMap)
 
@@ -39,11 +39,11 @@ func (sc *PBSCollector) collectJobQstat(jobid string) {
 	}
 	if err != nil {
 		log.Errorf("qstat: %s ", err.Error())
-		return
+		return nil
 	}
 	
 	// wait for stdout to fill (it is being filled async by ssh)
-	time.Sleep(2000 * time.Millisecond)
+	time.Sleep(1000 * time.Millisecond)
 	sc.setLastTime()
 
 	var buffer = sshSession.OutBuffer
@@ -58,12 +58,14 @@ func (sc *PBSCollector) collectJobQstat(jobid string) {
 		split_line := strings.Split(line," = ")
 		if len(split_line) == 2 {
 			field_name := strings.ToLower(split_line[0])
-			field_value := split_line[1]
+			field_value := split_line[1]			
+			field_value = strings.TrimRightFunc(field_value, func(r rune) bool { return unicode.IsSpace(r) })			
 			jobDetails[field_name] = field_value
 		}
 	}
 	
-	sc.jobsMap[jobid] = jobDetails
+	// sc.jobsMap[jobid] = jobDetails
+	return jobDetails
 }
 
 func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
@@ -97,7 +99,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 	if error == nil {
 		log.Debugf("qstat: Last header line read: %s", line)
 	} else {
-		log.Fatalf("qstat: Something went wrong when parsing  output: %s", error)
+		log.Fatalf("qstat: Something went wrong when parsing the output: %s", error)
 	}	
 
 	nextLine := nextLineIterator(sshSession.OutBuffer, qstatLineParser)
@@ -107,8 +109,9 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 			log.Warnln(err.Error())
 			continue
 		}
-		
-		// parse and send job state
+
+		// get job details		
+		jobdetails := sc.collectJobQstat(fields[aJOBID])
 		// status, statusOk := StatusDict[fields[aSTATE]]
 		status, statusOk := StatusDict[fields[aS]]
 		if statusOk {
@@ -117,19 +120,18 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 				sc.descPtrMap["userJobs"],
 				prometheus.GaugeValue,
 				float64(status),
-				// fields[aJOBID], fields[aNAME], fields[aUSERNAME], fields[aPARTITION],
-				// fields[aJOBID], fields[aJOBNAME], fields[aUSERNAME], fields[aQUEUE],
-				fields[aJOBID], 
-				fields[aUSERNAME], 
-				fields[aJOBNAME], 
-				fields[aS],
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS],				
+				/*jobdetails["ctime"], jobdetails["qtime"], jobdetails["mtime"], jobdetails["etime"],*/
+				jobdetails["start_time"], jobdetails["comp_time"], jobdetails["total_runtime"],
+				jobdetails["resources_used.cput"],
+				jobdetails["resources_used.mem"],
+				jobdetails["resources_used.vmem"],
+				jobdetails["resources_used.walltime"],
 			)
 			sc.alreadyRegistered = append(sc.alreadyRegistered, fields[aJOBID])
 			//log.Debugln("Job " + fields[aJOBID] + " finished with state " + fields[aSTATE])
 			collected++
-			// }
-			
-			sc.collectJobQstat(fields[aJOBID])
+			// }			
 			
 		} else {
 			// log.Warnf("Couldn't parse job status: '%s', fields '%s'", fields[aSTATE], strings.Join(fields, "|"))
@@ -137,7 +139,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 		}
 	}
 
-	log.Infof("%d finished jobs collected", collected)
+	log.Infof("Collected jobs: %d", collected)
 }
 
 

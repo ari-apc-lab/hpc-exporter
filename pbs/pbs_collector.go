@@ -141,25 +141,13 @@ func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZo
 	newerPBSCollector.descPtrMap["userJobs"] = prometheus.NewDesc(
 		"te_qstat_u",
 		"user's jobs",
-		[]string{"jobid", "username", "jobname", "status"},
+		[]string{
+			"jobid", "username", "jobname", "status",
+			/*"ctime", "qtime", "mtime", "etime",*/
+			"start_time", "comp_time", "total_runtime",
+			"cput", "pmem", "vmem", "walltime",
+		},
 		nil,
-	)
-	
-	newerPBSCollector.descPtrMap["jobDetails"] = prometheus.NewDesc(
-		"te_qstat_f",
-		"job details",
-		[]string{"job_name",
-					"job_owner",
-					"job_state",
-					"ctime",
-					"mtime",
-					"output_path",
-					"qtime",
-					"euser",
-					"queue_type",
-					"etime",
-					"submit_args"},
-		nil,	
 	)
 
 /*	
