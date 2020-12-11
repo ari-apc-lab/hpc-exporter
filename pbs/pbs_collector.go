@@ -142,7 +142,7 @@ func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZo
 		"te_qstat_u",
 		"user's jobs",
 		[]string{
-			"jobid", "username", "jobname", "status",
+			"job_id", "username", "job_name", "job_state", "exit_status",
 			/*"ctime", "qtime", "mtime", "etime",*/
 			"start_time", "comp_time", "total_runtime",
 			"cput", "pmem", "vmem", "walltime",

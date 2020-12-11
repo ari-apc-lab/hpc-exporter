@@ -130,7 +130,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 				sc.descPtrMap["userJobs"],
 				prometheus.GaugeValue,
 				float64(status),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS],				
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
 				/*jobdetails["ctime"], jobdetails["qtime"], jobdetails["mtime"], jobdetails["etime"],*/
 				jobdetails["start_time"], jobdetails["comp_time"], jobdetails["total_runtime"],
 				jobdetails["resources_used.cput"],
