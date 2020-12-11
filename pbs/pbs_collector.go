@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
 	"hpc_exporter/ssh"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -62,13 +61,14 @@ type PBSCollector struct {
 	sshConfig         *ssh.SSHConfig
 	sshClient         *ssh.SSHClient
 	timeZone          *time.Location
+	targetJobIdsList	[]string
 	alreadyRegistered []string
-	lasttime          time.Time
+//	lasttime          time.Time
 	
 	jobsMap				map[string](jobDetailsMap)
 }
 
-func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZone string) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *PBSCollector {
 	newerPBSCollector := &PBSCollector{	
 		descPtrMap: make(map[string](*prometheus.Desc)),
 		/*
@@ -158,12 +158,21 @@ func NewerPBSCollector(host, sshUser, sshPass, sshPrivKey, sshKnownHosts, timeZo
 		nil,
 	)		
 */
+
+/*
 	var err error
 	newerPBSCollector.timeZone, err = time.LoadLocation(timeZone)
 	if err != nil {
 		log.Fatalln(err.Error())
 	}
 	newerPBSCollector.setLastTime()
+*/
+
+	if (targetJobIds != "") {
+		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
+		newerPBSCollector.targetJobIdsList = strings.Split(targetJobIds,",")
+	}
+	log.Infof("Target jobs, if specified: %s %d",newerPBSCollector.targetJobIdsList,len(newerPBSCollector.targetJobIdsList))
 	return newerPBSCollector
 }
 
@@ -213,9 +222,11 @@ func (sc *PBSCollector) executeSSHCommand(cmd string) (*ssh.SSHSession, error) {
 	}
 }
 
+/*
 func (sc *PBSCollector) setLastTime() {
 	sc.lasttime = time.Now().In(sc.timeZone).Add(-1 * time.Minute)
 }
+*/
 
 func parsePBSTime(field string) (uint64, error) {
 	var days, hours, minutes, seconds uint64

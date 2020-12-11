@@ -48,24 +48,30 @@ var (
 	sshPrivKey = flag.String(
 		"ssh-private-key",
 		"",
-		"SSH private key recognised by the remote frontend",
+		"Path to the SSH private key recognised by the remote frontend",
 	)
 	sshKnownHosts = flag.String(
 		"ssh-known-hosts",
 		"",
-		"SSH local known_hosts file including the remote frontend",
+		"Path to the SSH local known_hosts file including the remote frontend",
 	)
+	/*
 	countryTZ = flag.String(
 		"countrytz",
 		"Europe/Madrid",
 		"Country Time zone of the host, (e.g. \"Europe/Madrid\").",
+	)
+	*/
+	targetJobIds = flag.String(
+		"target-job-ids",
+		"",
+		"Comma-separated ids of the specific HPC jobs to monitor. Keep it unset to monitor all the jobs of the user.",
 	)
 	logLevel = flag.String(
 		"log-level",
 		"error",
 		"Log level of the Application.",
 	)
-
 )
 
 func main() {
@@ -84,7 +90,7 @@ func main() {
 	if *host == "localhost" {
 		flag.Usage()
 		log.Fatalln("Localhost connection not implemented yet.")
-	} else {		
+	} else {
 		if *sshUser == "" {
 			flag.Usage()
 			log.Fatalln("A user must be provided to connect to a frontend remotely.")
@@ -92,12 +98,12 @@ func main() {
 		switch authmethod := *sshAuthMethod; authmethod {
 			case "keypair":
 				if (*sshPrivKey == "" || *sshKnownHosts == "") {
-					flag.Usage() 
+					flag.Usage()
 					log.Fatalln("Paths to a private key and a known hosts file should be provided to connect to a frontend remotely using this authentication method.")
 				}
 			case "password":
 				if (*sshPass == "") {
-					flag.Usage() 
+					flag.Usage()
 					log.Fatalln("A password should be provided to connect to a frontend remotely using this authentication method.")
 				}
 			default:
@@ -105,7 +111,7 @@ func main() {
 				log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 		}
 	}
-	
+
 	switch sched := *scheduler; sched {
 	/*
 		case "torque":
@@ -114,11 +120,11 @@ func main() {
 	*/
 		case "pbs":
 			log.Debugf("Registering collector for scheduler %s", sched)
-			prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshPass, *sshPrivKey, *sshKnownHosts, *countryTZ))
+			prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshPass, *sshPrivKey, *sshKnownHosts, "", *targetJobIds))
 		default:
 			log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}
-	
+
 	// Expose the registered metrics via HTTP.
 	log.Infof("Starting Server: %s", *addr)
 	http.Handle("/metrics", promhttp.Handler())

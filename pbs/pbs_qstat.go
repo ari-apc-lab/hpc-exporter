@@ -43,8 +43,8 @@ func (sc *PBSCollector) collectJobQstat(jobid string) jobDetailsMap {
 	}
 	
 	// wait for stdout to fill (it is being filled async by ssh)
-	time.Sleep(1000 * time.Millisecond)
-	sc.setLastTime()
+	time.Sleep(500 * time.Millisecond)
+	//sc.setLastTime()
 
 	var buffer = sshSession.OutBuffer
 	
@@ -87,7 +87,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 
 	// wait for stdout to fill (it is being filled async by ssh)
 	time.Sleep(100 * time.Millisecond)
-	sc.setLastTime()
+	//sc.setLastTime()
 
 	var buffer = sshSession.OutBuffer
 
@@ -107,6 +107,10 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 		// check the line is correctly parsed
 		if err != nil {
 			log.Warnln(err.Error())
+			continue
+		}	
+	
+		if (len(sc.targetJobIdsList) > 0) && !(sc.jobIsTarget(fields[aJOBID])) {
 			continue
 		}
 
@@ -142,6 +146,14 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 	log.Infof("Collected jobs: %d", collected)
 }
 
+func (sc *PBSCollector) jobIsTarget(fullJobId string) bool {
+	// Check whether a job found in the qstat response is a monitoring target
+	isTarget := false	
+	for _, s := range sc.targetJobIdsList {
+		isTarget = isTarget || (s == fullJobId)
+	}
+	return isTarget
+}
 
 func jobIsNotInQueue(state int) bool {
 	// return state != sPENDING && state != sRUNNING && state != sCOMPLETING
