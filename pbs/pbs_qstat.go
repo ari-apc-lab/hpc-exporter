@@ -1,9 +1,10 @@
 package pbs
 
 import (
+	"io"
 	"strings"
-	"unicode"
 	"time"
+	"unicode"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -90,7 +91,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 	//sc.setLastTime()
 
 	var buffer = sshSession.OutBuffer
-
+	
 	line, error := buffer.ReadString('\n')	// new line
 	line, error = buffer.ReadString('\n')	// hazelhen-batch.hww.hlrs.de:
 	line, error = buffer.ReadString('\n')	// new line
@@ -99,7 +100,12 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 	if error == nil {
 		log.Debugf("qstat: Last header line read: %s", line)
 	} else {
-		log.Fatalf("qstat: Something went wrong when parsing the output: %s", error)
+		if error == io.EOF {
+			log.Info("qstat: No user jobs in the infrastructure")
+			return
+		} else {
+			log.Fatalf("qstat: Something went wrong when parsing the output: %s", error)
+		}
 	}	
 
 	nextLine := nextLineIterator(sshSession.OutBuffer, qstatLineParser)
