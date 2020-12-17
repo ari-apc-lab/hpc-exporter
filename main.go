@@ -120,7 +120,7 @@ func main() {
 	*/
 		case "pbs":
 			log.Debugf("Registering collector for scheduler %s", sched)
-			prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshPass, *sshPrivKey, *sshKnownHosts, "", *targetJobIds))
+			prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *targetJobIds))
 		default:
 			log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}

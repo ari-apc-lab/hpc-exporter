@@ -41,6 +41,9 @@ type SSHSession struct {
 }
 
 func NewSSHConfigByPassword(user, password, host string, port int) *SSHConfig {
+
+	log.Info("Trying to create a SSHConfig of type NewSSHConfigByPassword...")
+
 	return &SSHConfig{
 		Config: &ssh.ClientConfig{
 			User: user,

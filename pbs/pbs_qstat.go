@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -122,30 +123,113 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 
 		// get job details		
 		jobdetails := sc.collectJobQstat(fields[aJOBID])
-		// status, statusOk := StatusDict[fields[aSTATE]]
-		status, statusOk := StatusDict[fields[aS]]
-		if statusOk {
-			// if jobIsNotInQueue(status) {
+		state, stateOk := StatusDict[fields[aS]]
+		if stateOk {
+		
+			// Job state		
 			ch <- prometheus.MustNewConstMetric(
-				sc.descPtrMap["userJobs"],
+				sc.descPtrMap["userJobState"],
 				prometheus.GaugeValue,
-				float64(status),
+				float64(state),
 				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
-				/*jobdetails["ctime"], jobdetails["qtime"], jobdetails["mtime"], jobdetails["etime"],*/
-				jobdetails["start_time"], jobdetails["comp_time"], jobdetails["total_runtime"],
-				jobdetails["resources_used.cput"],
-				jobdetails["resources_used.mem"],
-				jobdetails["resources_used.vmem"],
-				jobdetails["resources_used.walltime"],
 			)
-			sc.alreadyRegistered = append(sc.alreadyRegistered, fields[aJOBID])
-			//log.Debugln("Job " + fields[aJOBID] + " finished with state " + fields[aSTATE])
-			collected++
-			// }			
 			
+			// Job exit status			
+			exit_status, exit_status_err := strconv.ParseInt(jobdetails["exit_status"], 10, 0)
+			if exit_status_err != nil {
+				exit_status = -1
+			}						
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap["userJobExitStatus"],
+				prometheus.GaugeValue,
+				float64(exit_status),
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+			)
+			
+			// Job total runtime
+			total_runtime, total_runtime_err := strconv.ParseFloat(jobdetails["total_runtime"], 64)
+			if total_runtime_err != nil {
+				total_runtime = -1
+			}						
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap["userJobTotalRuntime"],
+				prometheus.GaugeValue,
+				float64(total_runtime),
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+				jobdetails["start_time"],jobdetails["comp_time"],
+			)
+				
+			// Job resources consumed wall time
+			walltime := -1.0
+			if jobdetails["resources_used.walltime"] != "" {
+				split_walltime := strings.Split(jobdetails["resources_used.walltime"],":")
+				walltime_hh, _ := strconv.ParseFloat(split_walltime[0], 64)
+				walltime_mm, _ := strconv.ParseFloat(split_walltime[1], 64)
+				walltime_ss, _ := strconv.ParseFloat(split_walltime[2], 64)
+				walltime = walltime_hh * 3600.0 + walltime_mm * 60.0 + walltime_ss
+			}			
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap["userJobResourcesWallTime"],
+				prometheus.GaugeValue,
+				float64(walltime),
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+				jobdetails["start_time"],jobdetails["comp_time"],		
+			)
+			
+			// Job resources consumed cpu time
+			cputime := -1.0
+			if jobdetails["resources_used.cput"] != "" {
+				split_cputime := strings.Split(jobdetails["resources_used.cput"],":")
+				cputime_hh, _ := strconv.ParseFloat(split_cputime[0], 64)
+				cputime_mm, _ := strconv.ParseFloat(split_cputime[1], 64)
+				cputime_ss, _ := strconv.ParseFloat(split_cputime[2], 64)
+				cputime = cputime_hh * 3600.0 + cputime_mm * 60.0 + cputime_ss
+			}			
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap["userJobResourcesCpuTime"],
+				prometheus.GaugeValue,
+				float64(cputime),
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+				jobdetails["start_time"],jobdetails["comp_time"],		
+			)
+			
+			// Job resources consumed pyhsical memory		
+			physmem := -1.0
+			physmem_units := ""
+			if jobdetails["resources_used.mem"] != "" {
+				split_physmem := strings.Split(jobdetails["resources_used.mem"],"k")
+				physmem, _ = strconv.ParseFloat(split_physmem[0], 64)
+				physmem_units = "kb"
+			}
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap["userJobResourcesPhysMem"],
+				prometheus.GaugeValue,
+				float64(physmem),
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+				physmem_units,		
+			)	
+			
+			// Job resources consumed virtual memory
+			virtmem := -1.0
+			virtmem_units := ""
+			if jobdetails["resources_used.vmem"] != "" {
+				split_virtmem := strings.Split(jobdetails["resources_used.vmem"],"k")
+				virtmem, _ = strconv.ParseFloat(split_virtmem[0], 64)
+				virtmem_units = "kb"
+			}
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap["userJobResourcesVirtMem"],
+				prometheus.GaugeValue,
+				float64(virtmem),
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+				virtmem_units,		
+			)		
+			
+			sc.alreadyRegistered = append(sc.alreadyRegistered, fields[aJOBID])
+			collected++
+		
 		} else {
-			// log.Warnf("Couldn't parse job status: '%s', fields '%s'", fields[aSTATE], strings.Join(fields, "|"))
-			log.Warnf("Couldn't parse job status: '%s', fields '%s'", fields[aS], strings.Join(fields, "|"))
+			log.Warnf("Couldn't parse job state: '%s', fields '%s'", fields[aS], strings.Join(fields, "|"))
 		}
 	}
 
