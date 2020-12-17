@@ -20,7 +20,7 @@ go build
 ```
 3. Run the exporter
 ```
-torque_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> -ssh-user <USER> -ssh-auth-method <AUTH>
+hpc_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> -ssh-user <USER> -ssh-auth-method <AUTH>
 [-ssh-password <PASS> | -ssh-known-hosts <PATH> -ssh-private-key <PATH>]  -log.level=<LOGLEVEL> [-target-job-ids <JOBLIST>]
 ```
 - `<HOST>`: `localhost` as default, not supported 
