@@ -1,4 +1,37 @@
 # hpc-exporter
 
-This repository will contain a Prometheus exporter that monitors HPC infrastructure.
- 
+This exporter connects via ssh to the frontend of a given HPC infrastructure and queries the scheduler in order to collect metrics of user jobs and expose them in Prometheus format.
+
+## Schedulers and info/metrics 
+### PBS Professional
+- job_id, username, job_name
+- job_state, exit_status
+- start_time, comp_time, total_runtime
+- resources_used.cput, resources_used.mem, resources_used.vmem, resources_used.walltime
+
+## Usage
+1. Download the code
+2. Enter the folder and build it with go
+```
+go build
+```
+3. Run the exporter
+```
+torque_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> -ssh-user <USER> -ssh-auth-method <AUTH>
+[-ssh-password <PASS> | -ssh-known-hosts <PATH> -ssh-private-key <PATH>]  -log.level=<LOGLEVEL> [-target-job-ids <JOBLIST>]
+```
+- `<HOST>`: `localhost` as default, not supported 
+- `<PORT>`: `:9100` as default, any free port upper to   
+- `<SCHED>`: `pbs` as default, installed in sodalite-fe.hlrs.de
+- `<USER>`: SSH user to connect to the `<HOST>` frontend
+- `<AUTH>`: see **Authentication methods** below for details
+- `<LOGLEVEL>`: `error` as default, `info` and `debug` also supported
+- `<JOBLIST>`: see **Targeting specific user jobs** for details
+
+### Authentication methods
+Authentication methods supported are `password` and `keypair`.
+- The `password` method needs the clear password to be set with `-ssh-password <PASS>`.
+- The `keypair` expects the paths to known hosts (`-ssh-known-hosts <PATH>`) and private key (`-ssh-private-key <PATH>`) files of the user.
+
+### Targeting specific user jobs
+The parameter `-target-job-ids <JOBLIST>` expects a comma-separated list of specific user jobs to be monitored. Please omit the parameter to monitor all the jobs launched by the user.
