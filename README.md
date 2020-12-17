@@ -2,12 +2,15 @@
 
 This exporter connects via ssh to the frontend of a given HPC infrastructure and queries the scheduler in order to collect metrics of user jobs and expose them in Prometheus format.
 
-## Schedulers and info/metrics 
+## Schedulers and metrics collected
 ### PBS Professional
-- job_id, username, job_name
-- job_state, exit_status
-- start_time, comp_time, total_runtime
-- resources_used.cput, resources_used.mem, resources_used.vmem, resources_used.walltime
+- `pbs_qstat_u_jobstate{exit_status,job_id,job_name,job_state,username}`: Job state numeric code
+- `pbs_qstat_u_jobstate{exit_status,job_id,job_name,job_state,username}`: Exit status numeric code
+- `pbs_qstat_u_totalruntime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: `total_runtime` in seconds
+- `pbs_qstat_u_consumedcputime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: `resources_used.cput` in seconds
+- `pbs_qstat_u_consumedwalltime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: `resources_used.walltime` in seconds
+- `pbs_qstat_u_consumedpmem{exit_status,job_id,job_name,job_state,units,username}`: `resources_used.mem` in `units`
+- `pbs_qstat_u_consumedvmem{exit_status,job_id,job_name,job_state,units,username}`: `resources_used.vmem` in `units`
 
 ## Usage
 1. Download the code
