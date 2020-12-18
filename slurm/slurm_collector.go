@@ -161,7 +161,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		"slurm_jobwalltime",
 		"user job current state",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "wall_time",
+			"job_id", "username", "job_name", "job_state", "exit_status_full", "wall_time",
 		},
 		nil,
 	)

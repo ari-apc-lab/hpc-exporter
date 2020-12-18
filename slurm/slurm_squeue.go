@@ -91,7 +91,7 @@ func (sc *SlurmCollector) collectSqueue(targetjobid string, ch chan<- prometheus
 				sc.descPtrMap["userJobWallTime"],
 				prometheus.GaugeValue,
 				float64(walltime),
-				fields[aJOBID], fields[aUSER], fields[aNAME], fields[aSTATE], fields[aTIME], 
+				fields[aJOBID], fields[aUSER], fields[aNAME], fields[aSTATE], "-1:-1", fields[aTIME],
 			)
 	
 		} else {
@@ -215,7 +215,7 @@ func (sc *SlurmCollector) collectSacct(targetjobid string, ch chan<- prometheus.
 				sc.descPtrMap["userJobWallTime"],
 				prometheus.GaugeValue,
 				float64(walltime),
-				fields[accJOBID], sshUser, fields[accNAME], fields[accSTATE], fields[accELAPSED], 
+				fields[accJOBID], sshUser, fields[accNAME], fields[accSTATE], fields[accEXITCODE], fields[accELAPSED], 
 			)
 		
 		} else {
