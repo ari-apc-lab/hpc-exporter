@@ -83,21 +83,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		default:
 			log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
-	
-	/*
-	newerPBSCollector.descPtrMap["userJobs"] = prometheus.NewDesc(
-		"te_qstat_u",
-		"user's jobs",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-			//"ctime", "qtime", "mtime", "etime",
-			"start_time", "comp_time", "total_runtime",
-			"cput", "pmem", "vmem", "walltime",
-		},
-		nil,
-	)
-	*/
-	
+
 	newerPBSCollector.descPtrMap["userJobState"] = prometheus.NewDesc(
 		"pbs_qstat_u_jobstate",
 		"user job current state",
@@ -164,14 +150,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		nil,
 	)		
 
-/*	
-	newerPBSCollector.descPtrMap["partitionNodes"] = prometheus.NewDesc(
-		"te_qstat_f",
-		"job details",
-		[]string{"partition", "availability", "state"},
-		nil,
-	)		
-
+/*
 	var err error
 	newerPBSCollector.timeZone, err = time.LoadLocation(timeZone)
 	if err != nil {
@@ -208,8 +187,6 @@ func (sc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	
 	sc.collectQstat(ch)
-	// sc.collectQueue(ch)
-	// sc.collectInfo(ch)
 
 	err = sc.sshClient.Close()
 	if err != nil {

@@ -94,9 +94,9 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 	var buffer = sshSession.OutBuffer
 	
 	line, error := buffer.ReadString('\n')	// new line
-	line, error = buffer.ReadString('\n')	// hazelhen-batch.hww.hlrs.de:
+	line, error = buffer.ReadString('\n')	// frontend header line
 	line, error = buffer.ReadString('\n')	// new line
-	line, error = buffer.ReadString('\n')	// header line: "Job ID..."
+	line, error = buffer.ReadString('\n')	// fields header line
 	line, error = buffer.ReadString('\n')	// dashes: "------..."
 	if error == nil {
 		log.Debugf("qstat: Last header line read: %s", line)
@@ -243,11 +243,6 @@ func (sc *PBSCollector) jobIsTarget(fullJobId string) bool {
 		isTarget = isTarget || (s == fullJobId)
 	}
 	return isTarget
-}
-
-func jobIsNotInQueue(state int) bool {
-	// return state != sPENDING && state != sRUNNING && state != sCOMPLETING
-	return state != sEXITING && state != sQUEUED && state != sRUNNING
 }
 
 func qstatLineParser(line string) []string {
