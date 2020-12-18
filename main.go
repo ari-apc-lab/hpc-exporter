@@ -10,7 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"hpc_exporter/pbs"
-//	"hpc_exporter/torque"
+	"hpc_exporter/slurm"
 )
 
 var (
@@ -113,14 +113,12 @@ func main() {
 	}
 
 	switch sched := *scheduler; sched {
-	/*
-		case "torque":
-			log.Debugf("Registering collector for scheduler %s", sched)
-			prometheus.MustRegister(torque.NewerTorqueCollector(*host, *sshUser, *sshPass, *countryTZ))
-	*/
 		case "pbs":
 			log.Debugf("Registering collector for scheduler %s", sched)
 			prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *targetJobIds))
+		case "slurm":
+			log.Debugf("Registering collector for scheduler %s", sched)
+			prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *targetJobIds))
 		default:
 			log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}
