@@ -44,7 +44,6 @@ var (
 		"",
 		"SSH password for remote frontend connection (no localhost).",
 	)
-
 	sshPrivKey = flag.String(
 		"ssh-private-key",
 		"",
@@ -97,9 +96,14 @@ func main() {
 		}
 		switch authmethod := *sshAuthMethod; authmethod {
 			case "keypair":
-				if (*sshPrivKey == "" || *sshKnownHosts == "") {
+//				if (*sshPrivKey == "" || *sshKnownHosts == "") {
+				if (*sshPrivKey == "") {
 					flag.Usage()
-					log.Fatalln("Paths to a private key and a known hosts file should be provided to connect to a frontend remotely using this authentication method.")
+//					log.Fatalln("Paths to a private key and a known hosts file should be provided to connect to a frontend remotely using this authentication method.")
+					log.Fatalln("Path to a private key should be provided to connect to a frontend remotely using this authentication method.")
+				}
+				if (*sshKnownHosts == "") {
+					log.Infoln("Known hosts file is not mandatory but recommended.")
 				}
 			case "password":
 				if (*sshPass == "") {

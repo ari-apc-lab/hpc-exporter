@@ -100,9 +100,14 @@ func NewSSHConfigByPublicKeys(user, host string, port int, private_key_path stri
 		log.Info("Signer created for the parsed private key")
 	}
 
-        hostKeyCallback, err := knownhosts.New(known_hosts_path)
-        if err != nil {
-                log.Fatalf("unable to parse local known_hosts file: %v", err)
+	hostKeyCallback, err := knownhosts.New(known_hosts_path)
+	if err != nil {
+		if (known_hosts_path == "") {
+			log.Warnln("SSH connection without known hosts checking is insecure")
+			hostKeyCallback = ssh.InsecureIgnoreHostKey()
+		} else {
+			log.Fatalf("unable to parse local known_hosts file: %v", err)
+		}
 	} else {
 		log.Info("Local known_hosts file parsed")
 	}
