@@ -4,16 +4,16 @@ This exporter connects via ssh to the frontend of a given HPC infrastructure and
 
 ## Metrics collected for supported schedulers
 ### PBS Professional
-- `pbs_qstat_u_jobstate{exit_status,job_id,job_name,job_state,username}`: Job state numeric code
+- `pbs_qstat_u_jobstate{exit_status,job_id,job_name,job_state,username}`: Job state numeric code (list available in [code](https://github.com/SODALITE-EU/hpc-exporter/blob/45d79bdacd147046586529dcb0ab4314ad367f91/pbs/pbs_collector.go#L17))
 - `pbs_qstat_u_jobstate{exit_status,job_id,job_name,job_state,username}`: Exit status numeric code
-- `pbs_qstat_u_totalruntime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: `total_runtime` in seconds
-- `pbs_qstat_u_consumedcputime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: `resources_used.cput` in seconds
-- `pbs_qstat_u_consumedwalltime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: `resources_used.walltime` in seconds
-- `pbs_qstat_u_consumedpmem{exit_status,job_id,job_name,job_state,units,username}`: `resources_used.mem` in `units`
-- `pbs_qstat_u_consumedvmem{exit_status,job_id,job_name,job_state,units,username}`: `resources_used.vmem` in `units`
+- `pbs_qstat_u_totalruntime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: Total runtime in seconds
+- `pbs_qstat_u_consumedcputime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: CPU time consumed in seconds
+- `pbs_qstat_u_consumedwalltime{comp_time,exit_status,job_id,job_name,job_state,start_time,username}`: Wall time consumed in seconds
+- `pbs_qstat_u_consumedpmem{exit_status,job_id,job_name,job_state,units,username}`: Physical memory consumed in `units`
+- `pbs_qstat_u_consumedvmem{exit_status,job_id,job_name,job_state,units,username}`: Virtual memory consumed in `units`
 
 ### SLURM
-- `slurm_jobstate{exit_status_full,job_id,job_name,job_state,username}`: Job state numeric code
+- `slurm_jobstate{exit_status_full,job_id,job_name,job_state,username}`: Job state numeric code (list available in [code](https://github.com/SODALITE-EU/hpc-exporter/blob/45d79bdacd147046586529dcb0ab4314ad367f91/slurm/slurm_collector.go#L17))
 - `slurm_jobexitstatus1{exit_status_full,job_id,job_name,job_state,username}`: LHS of X:X exit status code
 - `slurm_jobexitstatus2{exit_status_full,job_id,job_name,job_state,username}`: RHS of X:X exit status code
 - `slurm_jobwalltime{exit_status_full,job_id,job_name,job_state,username,wall_time}`: Job elapsed wall time in seconds
