@@ -1,0 +1,10 @@
+username: jorge
+docker-network: sodalite
+ssh-key-file-path: /home/jorge/.ssh/id_rsa
+hpc-exporter-env:
+  HPC_FRONTEND=sodalite-fe.hlrs.de
+  EXPORTER_PORT=9100
+  SCHEDULER=pbs
+  SSH_USER=jorge
+  LOG_LEVEL=info
+  JOBLIST=

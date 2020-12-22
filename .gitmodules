@@ -1,0 +1,3 @@
+[submodule "docker/modules"]
+	path = docker/modules
+	url = https://github.com/SODALITE-EU/iac-modules.git
