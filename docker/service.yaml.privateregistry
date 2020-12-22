@@ -6,7 +6,6 @@ imports:
   - modules/docker/docker_network.yaml
   - modules/docker/docker_registry.yaml
   - modules/docker/docker_component.yaml
-# - modules/docker/docker_certificate.yaml
   - modules/misc/ssh/types.yaml
   - library/hpc-exporter/ssh-key-config.yaml
 
@@ -53,10 +52,10 @@ topology_template:
         - host: sodalite-vm
         - dependency: docker-host
 
-    docker-local-registry:
+    docker-sodalite-private-registry:
       type: sodalite.nodes.DockerRegistry
       properties:  
-        docker_registry_url: localhost:5555
+        docker_registry_url: 77.231.202.207
       requirements:
         - host: sodalite-vm
         - dependency: docker-host
@@ -69,10 +68,8 @@ topology_template:
     monitoring-system-hpc-exporter:
       type: sodalite.nodes.DockerizedComponent
       properties:
-        image_name: hpc-exporter
+        image_name: monitoring-system-hpc-exporter
         restart_policy: "no"
-#       ports: ['9100:9100']
-#       exposed_ports:  ['9100']
         docker_network_name:  { get_property: [ SELF, network, name ] }
         env: { get_input: hpc-exporter-env }
         volumes:
@@ -81,5 +78,5 @@ topology_template:
       requirements:
         - host: sodalite-vm
         - network: docker-network
-        - registry: docker-local-registry
+        - registry: docker-sodalite-private-registry
         - dependency: monitoring-system-hpc-exporter-ssh-key-config
