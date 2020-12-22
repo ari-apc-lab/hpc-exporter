@@ -19,6 +19,8 @@ This exporter connects via ssh to the frontend of a given HPC infrastructure and
 - `slurm_jobwalltime{exit_status_full,job_id,job_name,job_state,username,wall_time}`: Job elapsed wall time in seconds
 
 ## Usage
+
+### Standalone
 1. Download the code
 2. Enter the folder and build it with go
 ```
@@ -36,6 +38,9 @@ hpc_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> -ssh-user <U
 - `<AUTH>`: see **Authentication methods** below for details
 - `<LOGLEVEL>`: `error` as default, `info` and `debug` also supported
 - `<JOBLIST>`: see **Targeting specific user jobs** for details
+
+### Dockerization
+Check the [README.md](docker/README.md) file in [`docker`](docker) folder for instructions about Docker deployment of HPC exporters
 
 ### Authentication methods
 Authentication methods supported are `password` and `keypair`.
