@@ -1,6 +1,6 @@
 FROM golang:1.13.8-alpine
 
-# LABEL maintainer="fabeirojorge.secondwindow@gmail.com"
+# LABEL maintainer="jesus.ramos.external@atos.net"
 
 RUN mkdir /app
 WORKDIR /app
