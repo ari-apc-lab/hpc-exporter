@@ -11,17 +11,17 @@ pipeline {
 
         TAG_MAJOR_RELEASE = """${sh(
                 returnStdout: true,
-                script: './docker/CI-CD/validate_tag.sh MajRel $BRANCH_NAME'
+                script: './docker/validate_tag.sh MajRel $BRANCH_NAME'
             )}"""
 
         TAG_PRODUCTION = """${sh(
                 returnStdout: true,
-                script: './docker/CI-CD/validate_tag.sh production $BRANCH_NAME'
+                script: './docker/validate_tag.sh production $BRANCH_NAME'
             )}"""
 
         TAG_STAGING = """${sh(
                 returnStdout: true,
-                script: './docker/CI-CD/validate_tag.sh staging $BRANCH_NAME'
+                script: './docker/validate_tag.sh staging $BRANCH_NAME'
             )}"""
    }
     stages {
