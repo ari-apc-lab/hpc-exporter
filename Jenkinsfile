@@ -52,7 +52,7 @@ pipeline {
                 }
              }
             steps {
-                sh "cd docker && ./make_docker.sh build HPC-exporter"
+                sh "cd docker && ./make_docker.sh build hpc-exporter"
             }
         }
         stage('Push HPC-exporter to sodalite-private-registry') {
@@ -68,7 +68,7 @@ pipeline {
             steps {
                 withDockerRegistry(credentialsId: 'jenkins-sodalite.docker_token', url: '') {
                     sh  """#!/bin/bash
-                        ./make_docker.sh push HPC-exporter staging
+                        ./docker/make_docker.sh push hpc-exporter staging
                         """
                 }
             }
@@ -85,7 +85,7 @@ pipeline {
              }
             steps {
                 withDockerRegistry(credentialsId: 'jenkins-sodalite.docker_token', url: '') {
-                    sh "./make_docker.sh push HPC-exporter production"
+                    sh "./docker/make_docker.sh push hpc-exporter production"
                 }
             }
         }
