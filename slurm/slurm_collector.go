@@ -102,23 +102,28 @@ type CollectFunc func(ch chan<- prometheus.Metric)
 type jobDetailsMap map[string](string)
 
 type SlurmCollector struct {
-	descPtrMap        map[string](*prometheus.Desc)
-	sshConfig         *ssh.SSHConfig
-	sshClient         *ssh.SSHClient
-	timeZone          *time.Location
-	alreadyRegistered []string
-	lasttime          time.Time
+	gaugeJobsStatusMap	map[string](*prometheus.Gauge)
+	gaugeJobsElapsedMap	map[string](*prometheus.Gauge)
+	gaugeJobsNCPUSMap	map[string](*prometheus.Gauge)
+	gaugeJobsVMEMOMap	map[string](*prometheus.Gauge)
+	gaugeJobsSUBMITMap	map[string](*prometheus.Gauge)
+	gaugePartitionsMap	map[string](*prometheus.Gauge)
+
+	sshConfig     	*ssh.SSHConfig
+	sshClient     	*ssh.SSHClient
+	timeZone      	*time.Location
+	trackedJobs		[]string
+	lasttime        time.Time
 
 	jobsMap map[string](jobDetailsMap)
-
-	targetJobIdsList []string
 }
 
 func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
-		descPtrMap:        make(map[string](*prometheus.Desc)),
-		sshClient:         nil,
-		alreadyRegistered: make([]string, 0),
+		gaugeOptsMap:      	make(map[string](*prometheus.Desc)),
+		gaugeJobsMap:      	make(map[string](*prometheus.Gauge)),
+		sshClient:         	nil,
+		trackedJobs:		make([]string, 0)
 	}
 
 	switch authmethod := sshAuthMethod; authmethod {
@@ -130,14 +135,14 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
-	newerSlurmCollector.descPtrMap["JobStatus"] = prometheus.NewDesc(
-		"slurm_jobstatus",
+	newerSlurmCollector.gaugeOptsMap["JobStatus"] = prometheus.GaugeOpts{
+		name: "slurm_jobstatus",
 		"Current status of the job",
 		[]string{
 			"job_id", "username", "job_name", "partition",
 		},
 		nil,
-	)
+	}
 
 	newerSlurmCollector.descPtrMap["JobExitStatus1"] = prometheus.NewDesc(
 		"slurm_jobexitstatus1",
@@ -189,14 +194,6 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		newerSlurmCollector.timeZone, _ = time.LoadLocation("Local")
 		log.Warningln("Did not recognize time zone, set 'Local' timezone instead")
 	}
-	if targetJobIds != "" {
-		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
-		newerSlurmCollector.targetJobIdsList = strings.Split(targetJobIds, ",")
-		log.Infof("Target jobs: %s %d", newerSlurmCollector.targetJobIdsList, len(newerSlurmCollector.targetJobIdsList))
-	} else {
-		log.Fatalf("Target jobs list is mandatory for Slurm collector")
-		return nil
-	}
 
 	return newerSlurmCollector
 }
@@ -220,7 +217,7 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	sc.collectJobInfo(ch)
+	sc.collectAcct(ch)
 
 	err = sc.sshClient.Close()
 	if err != nil {
