@@ -4,172 +4,195 @@ import (
 	"bytes"
 	"errors"
 	"io"
-//	"strconv"
+
+	//	"strconv"
+	"hpc_exporter/ssh"
 	"strings"
 	"time"
-	"hpc_exporter/ssh"
-	
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	sBOOT_FAIL 		= iota
-	sCANCELLED		= iota
-	sCOMPLETED		= iota
-	sCONFIGURING	= iota
-	sCOMPLETING		= iota
-	sDEADLINE		= iota
-	sFAILED			= iota
-	sNODE_FAIL		= iota
-	sOUT_OF_MEMORY	= iota
-	sPENDING			= iota
-	sPREEMPTED		= iota
-	sRUNNING			= iota
-	sRESV_DEL_HOLD	= iota
-	sREQUEUE_FED	= iota
-	sREQUEUE_HOLD	= iota
-	sREQUEUED		= iota
-	sRESIZING		= iota
-	sREVOKED			= iota
-	sSIGNALING		= iota
-	sSPECIAL_EXIT	= iota
-	sSTAGE_OUT		= iota
-	sSTOPPED			= iota
-	sSUSPENDED		= iota
-	sTIMEOUT			= iota
+	sBOOT_FAIL = iota
+	sCANCELLED
+	sCOMPLETED
+	sCONFIGURING
+	sCOMPLETING
+	sDEADLINE
+	sFAILED
+	sNODE_FAIL
+	sOUT_OF_MEMORY
+	sPENDING
+	sPREEMPTED
+	sRUNNING
+	sRESV_DEL_HOLD
+	sREQUEUE_FED
+	sREQUEUE_HOLD
+	sREQUEUED
+	sRESIZING
+	sREVOKED
+	sSIGNALING
+	sSPECIAL_EXIT
+	sSTAGE_OUT
+	sSTOPPED
+	sSUSPENDED
+	sTIMEOUT
 )
 
 // StatusDict maps string status with its int values
 var ShortStatusDict = map[string]int{
-	"BF"	:	sBOOT_FAIL,
-	"CA"	:	sCANCELLED,
-	"CD"	:	sCOMPLETED,
-	"CF"	:	sCONFIGURING,
-	"CG"	:	sCOMPLETING,
-	"DL"	:	sDEADLINE,
-	"F"	:	sFAILED,
-	"NF"	:	sNODE_FAIL,
-	"OOM"	:	sOUT_OF_MEMORY,
-	"PD"	:	sPENDING,
-	"PR"	:	sPREEMPTED,
-	"R"	:	sRUNNING,
-	"RD"	:	sRESV_DEL_HOLD,
-	"RF"	:	sREQUEUE_FED,
-	"RH"	:	sREQUEUE_HOLD,
-	"RQ"	:	sREQUEUED,
-	"RS"	:	sRESIZING,
-	"RV"	:	sREVOKED,
-	"SI"	:	sSIGNALING,
-	"SE"	:	sSPECIAL_EXIT,
-	"SO"	:	sSTAGE_OUT,
-	"ST"	:	sSTOPPED,
-	"S"	:	sSUSPENDED,
-	"TO"	:	sTIMEOUT,
+	"BF":  sBOOT_FAIL,
+	"CA":  sCANCELLED,
+	"CD":  sCOMPLETED,
+	"CF":  sCONFIGURING,
+	"CG":  sCOMPLETING,
+	"DL":  sDEADLINE,
+	"F":   sFAILED,
+	"NF":  sNODE_FAIL,
+	"OOM": sOUT_OF_MEMORY,
+	"PD":  sPENDING,
+	"PR":  sPREEMPTED,
+	"R":   sRUNNING,
+	"RD":  sRESV_DEL_HOLD,
+	"RF":  sREQUEUE_FED,
+	"RH":  sREQUEUE_HOLD,
+	"RQ":  sREQUEUED,
+	"RS":  sRESIZING,
+	"RV":  sREVOKED,
+	"SI":  sSIGNALING,
+	"SE":  sSPECIAL_EXIT,
+	"SO":  sSTAGE_OUT,
+	"ST":  sSTOPPED,
+	"S":   sSUSPENDED,
+	"TO":  sTIMEOUT,
 }
 
 var LongStatusDict = map[string]int{
-	"BOOT_FAIL"		: sBOOT_FAIL,
-	"CANCELLED"		: sCANCELLED,
-	"COMPLETED"		: sCOMPLETED,
-	"CONFIGURING"	: sCONFIGURING,
-	"COMPLETING"	: sCOMPLETING,
-	"DEADLINE"		: sDEADLINE,
-	"FAILED"			: sFAILED,
-	"NODE_FAIL"		: sNODE_FAIL,
+	"BOOT_FAIL":     sBOOT_FAIL,
+	"CANCELLED":     sCANCELLED,
+	"COMPLETED":     sCOMPLETED,
+	"CONFIGURING":   sCONFIGURING,
+	"COMPLETING":    sCOMPLETING,
+	"DEADLINE":      sDEADLINE,
+	"FAILED":        sFAILED,
+	"NODE_FAIL":     sNODE_FAIL,
 	"OUT_OF_MEMORY": sOUT_OF_MEMORY,
-	"PENDING"		: sPENDING,
-	"PREEMPTED"		: sPREEMPTED,
-	"RUNNING"		: sRUNNING,
+	"PENDING":       sPENDING,
+	"PREEMPTED":     sPREEMPTED,
+	"RUNNING":       sRUNNING,
 	"RESV_DEL_HOLD": sRESV_DEL_HOLD,
-	"REQUEUE_FED"	: sREQUEUE_FED,
-	"REQUEUE_HOLD"	: sREQUEUE_HOLD,
-	"REQUEUED"		: sREQUEUED,
-	"RESIZING"		: sRESIZING,
-	"REVOKED"		: sREVOKED,
-	"SIGNALING"		: sSIGNALING,
-	"SPECIAL_EXIT"	: sSPECIAL_EXIT,
-	"STAGE_OUT"		: sSTAGE_OUT,
-	"STOPPED"		: sSTOPPED,
-	"SUSPENDED"		: sSUSPENDED,
-	"TIMEOUT"		: sTIMEOUT,
+	"REQUEUE_FED":   sREQUEUE_FED,
+	"REQUEUE_HOLD":  sREQUEUE_HOLD,
+	"REQUEUED":      sREQUEUED,
+	"RESIZING":      sRESIZING,
+	"REVOKED":       sREVOKED,
+	"SIGNALING":     sSIGNALING,
+	"SPECIAL_EXIT":  sSPECIAL_EXIT,
+	"STAGE_OUT":     sSTAGE_OUT,
+	"STOPPED":       sSTOPPED,
+	"SUSPENDED":     sSUSPENDED,
+	"TIMEOUT":       sTIMEOUT,
 }
 
-type CollectFunc 		func(ch chan<- prometheus.Metric)
+type CollectFunc func(ch chan<- prometheus.Metric)
 
-type jobDetailsMap	map[string](string)
+type jobDetailsMap map[string](string)
 
 type SlurmCollector struct {
-	
-	descPtrMap			map[string](*prometheus.Desc)
-		
+	descPtrMap        map[string](*prometheus.Desc)
 	sshConfig         *ssh.SSHConfig
 	sshClient         *ssh.SSHClient
 	timeZone          *time.Location
-	targetJobIdsList	[]string
 	alreadyRegistered []string
-//	lasttime          time.Time
-	
-	jobsMap				map[string](jobDetailsMap)
+	lasttime          time.Time
+
+	jobsMap map[string](jobDetailsMap)
+
+	targetJobIdsList []string
 }
 
 func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *SlurmCollector {
-	newerSlurmCollector := &SlurmCollector {	
-		descPtrMap:				make(map[string](*prometheus.Desc)),
-		sshClient:				nil,
-		alreadyRegistered:	make([]string, 0),
+	newerSlurmCollector := &SlurmCollector{
+		descPtrMap:        make(map[string](*prometheus.Desc)),
+		sshClient:         nil,
+		alreadyRegistered: make([]string, 0),
 	}
-	
+
 	switch authmethod := sshAuthMethod; authmethod {
-		case "keypair":
-			newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(sshUser, host, 22, sshPrivKey, sshKnownHosts)
-		case "password":
-			newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPassword(sshUser, sshPass, host, 22)
-		default:
-			log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
+	case "keypair":
+		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(sshUser, host, 22, sshPrivKey, sshKnownHosts)
+	case "password":
+		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPassword(sshUser, sshPass, host, 22)
+	default:
+		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
-	
-	newerSlurmCollector.descPtrMap["userJobState"] = prometheus.NewDesc(
-		"slurm_jobstate",
-		"user job current state",
+
+	newerSlurmCollector.descPtrMap["JobStatus"] = prometheus.NewDesc(
+		"slurm_jobstatus",
+		"Current status of the job",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status_full",
-		},
-		nil,
-	)
-	
-	newerSlurmCollector.descPtrMap["userJobExitStatus1"] = prometheus.NewDesc(
-		"slurm_jobexitstatus1",
-		"user job current state",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status_full",
-		},
-		nil,
-	)
-		
-	newerSlurmCollector.descPtrMap["userJobExitStatus2"] = prometheus.NewDesc(
-		"slurm_jobexitstatus2",
-		"user job current state",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status_full",
-		},
-		nil,
-	)
-	
-	newerSlurmCollector.descPtrMap["userJobWallTime"] = prometheus.NewDesc(
-		"slurm_jobwalltime",
-		"user job current state",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status_full", "wall_time",
+			"job_id", "username", "job_name", "partition",
 		},
 		nil,
 	)
 
-	if (targetJobIds != "") {
+	newerSlurmCollector.descPtrMap["JobExitStatus1"] = prometheus.NewDesc(
+		"slurm_jobexitstatus1",
+		"Exit status 1 of the job",
+		[]string{
+			"job_id", "username", "job_name", "job_status", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobExitStatus2"] = prometheus.NewDesc(
+		"slurm_jobexitstatus2",
+		"Exit status 1 of the job",
+		[]string{
+			"job_id", "username", "job_name", "job_status", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobWallTime"] = prometheus.NewDesc(
+		"slurm_jobwalltime",
+		"Walltime of the job",
+		[]string{
+			"job_id", "username", "job_name", "job_status", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobnumCPUs"] = prometheus.NewDesc(
+		"slurm_jobncpus",
+		"Number of CPUS assigned to the job",
+		[]string{
+			"job_id", "username", "job_name", "job_status", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["partition_nodes"] = prometheus.NewDesc(
+		"slurm_partitionnodes",
+		"Nodes in each partition",
+		[]string{
+			"partition", "availability", "state",
+		},
+		nil,
+	)
+	var err error
+	newerSlurmCollector.timeZone, err = time.LoadLocation(timeZone)
+	if err != nil {
+		newerSlurmCollector.timeZone, _ = time.LoadLocation("Local")
+		log.Warningln("Did not recognize time zone, set 'Local' timezone instead")
+	}
+	if targetJobIds != "" {
 		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
-		newerSlurmCollector.targetJobIdsList = strings.Split(targetJobIds,",")
-		log.Infof("Target jobs: %s %d",newerSlurmCollector.targetJobIdsList,len(newerSlurmCollector.targetJobIdsList))
+		newerSlurmCollector.targetJobIdsList = strings.Split(targetJobIds, ",")
+		log.Infof("Target jobs: %s %d", newerSlurmCollector.targetJobIdsList, len(newerSlurmCollector.targetJobIdsList))
 	} else {
 		log.Fatalf("Target jobs list is mandatory for Slurm collector")
 		return nil
@@ -183,7 +206,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 func (sc *SlurmCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, element := range sc.descPtrMap {
 		ch <- element
-   }
+	}
 }
 
 // Collect read the values of the metrics and
@@ -196,7 +219,7 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("Creating SSH client: %s", err.Error())
 		return
 	}
-	
+
 	sc.collectJobInfo(ch)
 
 	err = sc.sshClient.Close()
