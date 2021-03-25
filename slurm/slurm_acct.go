@@ -16,7 +16,7 @@
 package slurm
 
 import (
-	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -56,6 +56,7 @@ func (sc *SlurmCollector) collectAcct(ch chan<- prometheus.Metric) {
 
 	// wait for stdout to fill (it is being filled async by ssh)
 	time.Sleep(1000 * time.Millisecond)
+	inactiveJobs := sc.trackedJobs
 
 	nextLine := nextLineIterator(sshSession.OutBuffer, sacctLineParser)
 	for fields, err := nextLine(); err == nil; fields, err = nextLine() {
@@ -66,100 +67,77 @@ func (sc *SlurmCollector) collectAcct(ch chan<- prometheus.Metric) {
 		}
 
 		// parse and send job state
-		jobid, jobidOK := fields[accJOBID]
-		if jobidOK {
-			if gauge, ok := sc.gaugeJobsMap[jobid] ; !ok {
+		jobid := fields[accJOBID]
 
-				sc.gaugeJobsStatusMap["jobid"] = prometheus.NewGauge(prometheus.GaugeOpts{
-					Namespace : "Slurm"
-					Subsystem : "JobID"
-					Name : 		"Status"
-					Help : 		"Status of a Job"
-					ConstLabels: map[string](string){
-						"jobid" : 		jobid
-						"user" : 		fields[accNAME]
-						"partition" : 	fields[accPARTITION]	
-					}
-				})
-				ch <- sc.gaugeJobsStatusMap["jobid"]
+		if _, ok := sc.gaugeJobsStatusMap[jobid]; !ok {
 
-				sc.gaugeJobsStatusMap["jobid"] = prometheus.NewGauge(prometheus.GaugeOpts{
-					Namespace : "Slurm"
-					Subsystem : "JobID"
-					Name : 		"Status"
-					Help : 		"Status of a Job"
-					ConstLabels: map[string](string){
-						"jobid" : 		jobid
-						"user" : 		fields[accNAME]
-						"partition" : 	fields[accPARTITION]	
-					}
-				})
-				ch <- sc.gaugeJobsStatusMap["jobid"]
+			sc.trackedJobs = append(sc.trackedJobs, jobid)
 
-				sc.gaugeJobsStatusMap["jobid"] = prometheus.NewGauge(prometheus.GaugeOpts{
-					Namespace : "Slurm"
-					Subsystem : "JobID"
-					Name : 		"Status"
-					Help : 		"Status of a Job"
-					ConstLabels: map[string](string){
-						"jobid" : 		jobid
-						"user" : 		fields[accNAME]
-						"partition" : 	fields[accPARTITION]	
-					}
-				})
-				ch <- sc.gaugeJobsStatusMap["jobid"]
-
-				sc.gaugeJobsStatusMap["jobid"] = prometheus.NewGauge(prometheus.GaugeOpts{
-					Namespace : "Slurm"
-					Subsystem : "JobID"
-					Name : 		"Status"
-					Help : 		"Status of a Job"
-					ConstLabels: map[string](string){
-						"jobid" : 		jobid
-						"user" : 		fields[accNAME]
-						"partition" : 	fields[accPARTITION]	
-					}
-				})
-				ch <- sc.gaugeJobsStatusMap["jobid"]
-
-				sc.gaugeJobsStatusMap["jobid"] = prometheus.NewGauge(prometheus.GaugeOpts{
-					Namespace : "Slurm"
-					Subsystem : "JobID"
-					Name : 		"Status"
-					Help : 		"Status of a Job"
-					ConstLabels: map[string](string){
-						"jobid" : 		jobid
-						"user" : 		fields[accNAME]
-						"partition" : 	fields[accPARTITION]	
-					}
-				})
-				ch <- sc.gaugeJobsStatusMap["jobid"]
-				
-
+			var const_Labels = map[string](string){
+				"jobid":     jobid,
+				"jobname":   fields[accNAME],
+				"user":      fields[accUSERNAME],
+				"partition": fields[accPARTITION],
 			}
 
-			sc.gaugeJobsStatusMap["jobid"].Set(fields[accSTATE])
-			sc.gaugeJobsElapsedMap["jobid"].Set(fields[accELAPSED])
-			sc.gaugeJobsVMEMOMap["jobid"].Set(fields[accVMEM])
-			sc.gaugeJobsNCPUSMap["jobid"].Set(fields[accNCPUS])
-			sc.gaugeJobsSUBMITMap["jobid"].Set(fields[accSUBMIT])
+			sc.gaugeJobsStatusMap[jobid] = prometheus.NewGauge(prometheus.GaugeOpts{
+				Namespace:   "Slurm",
+				Subsystem:   "JobID",
+				Name:        "Status",
+				Help:        "Status of a Job",
+				ConstLabels: const_Labels,
+			})
+
+			sc.gaugeJobsElapsedMap[jobid] = prometheus.NewGauge(prometheus.GaugeOpts{
+				Namespace:   "Slurm",
+				Subsystem:   "JobID",
+				Name:        "Elapsed",
+				Help:        "Elapsed time since the job started running in seconds",
+				ConstLabels: const_Labels,
+			})
+
+			sc.gaugeJobsNCPUSMap[jobid] = prometheus.NewGauge(prometheus.GaugeOpts{
+				Namespace:   "Slurm",
+				Subsystem:   "JobID",
+				Name:        "NCPUs",
+				Help:        "Number of CPUs assigned to the job",
+				ConstLabels: const_Labels,
+			})
+
+			sc.gaugeJobsVMEMOMap[jobid] = prometheus.NewGauge(prometheus.GaugeOpts{
+				Namespace:   "Slurm",
+				Subsystem:   "JobID",
+				Name:        "VMemAvg",
+				Help:        "Average virtual memory occupied by the job",
+				ConstLabels: const_Labels,
+			})
+
+			sc.gaugeJobsSUBMITMap[jobid] = prometheus.NewGauge(prometheus.GaugeOpts{
+				Namespace:   "Slurm",
+				Subsystem:   "JobID",
+				Name:        "SubmitTime",
+				Help:        "Time in seconds since the job was submitted",
+				ConstLabels: const_Labels,
+			})
 
 		} else {
-			log.Warnf("Couldn't parse job status: '%s', fields '%s'", fields[aSTATE], strings.Join(fields, "|"))
+			inactiveJobs.remove(jobid)
 		}
-	}
+		sc.gaugeJobsStatusMap[jobid].Set(float64(LongStatusDict[fields[accSTATE]]))
+		sc.gaugeJobsElapsedMap[jobid].Set(computeSlurmTime(fields[accELAPSED]))
+		sc.gaugeJobsVMEMOMap[jobid].Set(strconv.ParseFloat(fields[accVMEM], 64))
+		sc.gaugeJobsNCPUSMap[jobid].Set(strconv.ParseFloat(fields[accNCPUS], 64))
+		sc.gaugeJobsSUBMITMap[jobid].Set(computeSlurmTime(fields[accSUBMIT]))
+		ch <- sc.gaugeJobsStatusMap[jobid]
+		ch <- sc.gaugeJobsElapsedMap[jobid]
+		ch <- sc.gaugeJobsNCPUSMap[jobid]
+		ch <- sc.gaugeJobsVMEMOMap[jobid]
+		ch <- sc.gaugeJobsSUBMITMap[jobid]
 
+	}
+	collected++
 	log.Infof("%d finished jobs collected", collected)
-}
-
-func (sc *SlurmCollector) jobIsNotTracked(jobid string) bool {
-	for _, v := range sc.trackedJobs {
-		if v == jobid {
-			return false
-		}
-	}
-
-	return true
+	deleteJobs(inactiveJobs, sc)
 }
 
 func sacctLineParser(line string) []string {
@@ -171,4 +149,53 @@ func sacctLineParser(line string) []string {
 	}
 
 	return fields
+}
+
+func computeSlurmTime(timeField string) float64 {
+
+	split_walltime := strings.Split(timeField, ":")
+
+	walltime_dd := 0.0
+	walltime_hh := 0.0
+	walltime_mm := 0.0
+	walltime_ss := 0.0
+
+	switch numfields := len(split_walltime); numfields {
+	case 2:
+		walltime_mm, _ = strconv.ParseFloat(split_walltime[0], 64)
+		walltime_ss, _ = strconv.ParseFloat(split_walltime[1], 64)
+	case 3:
+		walltime_mm, _ = strconv.ParseFloat(split_walltime[1], 64)
+		walltime_ss, _ = strconv.ParseFloat(split_walltime[2], 64)
+		split_dh_walltime := strings.Split(split_walltime[0], "-")
+		switch innernumfields := len(split_dh_walltime); innernumfields {
+		case 1:
+			walltime_hh, _ = strconv.ParseFloat(split_dh_walltime[0], 64)
+		case 2:
+			walltime_dd, _ = strconv.ParseFloat(split_dh_walltime[0], 64)
+			walltime_hh, _ = strconv.ParseFloat(split_dh_walltime[1], 64)
+		}
+	}
+
+	walltime := walltime_dd*86400.0 + walltime_hh*3600.0 + walltime_mm*60.0 + walltime_ss
+	return walltime
+}
+
+func (iJ *trackedList) remove(job string) {
+	for i, v := range *iJ {
+		if v == job {
+			append(*iJ[:i], iJ[i+1:])
+		}
+	}
+}
+
+func deleteJobs(inactiveJobs []string, sc *SlurmCollector) {
+	for i, job := range inactiveJobs {
+		sc.trackedJobs = append(sc.trackedJobs[:i], sc.trackedJobs[(i+1):])
+		delete(sc.gaugeJobsStatusMap, job)
+		delete(sc.gaugeJobsElapsedMap, job)
+		delete(sc.gaugeJobsVMEMOMap, job)
+		delete(sc.gaugeJobsNCPUSMap, job)
+		delete(sc.gaugeJobsSUBMITMap, job)
+	}
 }

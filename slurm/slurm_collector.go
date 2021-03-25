@@ -7,7 +7,6 @@ import (
 
 	//	"strconv"
 	"hpc_exporter/ssh"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -16,31 +15,45 @@ import (
 )
 
 const (
-	sBOOT_FAIL = iota
-	sCANCELLED
-	sCOMPLETED
-	sCONFIGURING
+	sCOMPLETED = iota
 	sCOMPLETING
-	sDEADLINE
-	sFAILED
-	sNODE_FAIL
-	sOUT_OF_MEMORY
-	sPENDING
-	sPREEMPTED
-	sRUNNING
-	sRESV_DEL_HOLD
-	sREQUEUE_FED
-	sREQUEUE_HOLD
-	sREQUEUED
-	sRESIZING
-	sREVOKED
-	sSIGNALING
-	sSPECIAL_EXIT
 	sSTAGE_OUT
-	sSTOPPED
+	sRUNNING
+	sCONFIGURING
+	sPENDING
+	sREQUEUED
+	sREQUEUE_FED
+	sRESIZING
+	sRESV_DEL_HOLD
+	sREQUEUE_HOLD
+	sSIGNALING
 	sSUSPENDED
+	sSTOPPED
+	sPREEMPTED
+	sREVOKED
+	sSPECIAL_EXIT
+	sDEADLINE
 	sTIMEOUT
+	sOUT_OF_MEMORY
+	sBOOT_FAIL
+	sNODE_FAIL
+	sFAILED
+	sCANCELLED
 )
+
+const (
+	pUP = iota
+	pDOWN
+	pDRAIN
+	pINACT
+)
+
+var PartitionStateDict = map[string]int{
+	"up":    pUP,
+	"down":  pDOWN,
+	"drain": pDRAIN,
+	"inact": pINACT,
+}
 
 // StatusDict maps string status with its int values
 var ShortStatusDict = map[string]int{
@@ -101,29 +114,44 @@ type CollectFunc func(ch chan<- prometheus.Metric)
 
 type jobDetailsMap map[string](string)
 
-type SlurmCollector struct {
-	gaugeJobsStatusMap	map[string](*prometheus.Gauge)
-	gaugeJobsElapsedMap	map[string](*prometheus.Gauge)
-	gaugeJobsNCPUSMap	map[string](*prometheus.Gauge)
-	gaugeJobsVMEMOMap	map[string](*prometheus.Gauge)
-	gaugeJobsSUBMITMap	map[string](*prometheus.Gauge)
-	gaugePartitionsMap	map[string](*prometheus.Gauge)
+type trackedList []string
 
-	sshConfig     	*ssh.SSHConfig
-	sshClient     	*ssh.SSHClient
-	timeZone      	*time.Location
-	trackedJobs		[]string
-	lasttime        time.Time
+type SlurmCollector struct {
+	gaugeJobsStatusMap  map[string](prometheus.Gauge)
+	gaugeJobsElapsedMap map[string](prometheus.Gauge)
+	gaugeJobsNCPUSMap   map[string](prometheus.Gauge)
+	gaugeJobsVMEMOMap   map[string](prometheus.Gauge)
+	gaugeJobsSUBMITMap  map[string](prometheus.Gauge)
+	gaugePartsAvailMap  map[string](prometheus.Gauge)
+	gaugePartsIdleMap   map[string](prometheus.Gauge)
+	gaugePartsAllocMap  map[string](prometheus.Gauge)
+	gaugePartsTotalMap  map[string](prometheus.Gauge)
+
+	sshConfig         *ssh.SSHConfig
+	sshClient         *ssh.SSHClient
+	timeZone          *time.Location
+	trackedJobs       trackedList
+	trackedPartitions trackedList
+	lasttime          time.Time
 
 	jobsMap map[string](jobDetailsMap)
 }
 
 func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
-		gaugeOptsMap:      	make(map[string](*prometheus.Desc)),
-		gaugeJobsMap:      	make(map[string](*prometheus.Gauge)),
-		sshClient:         	nil,
-		trackedJobs:		make([]string, 0)
+
+		gaugeJobsStatusMap:  make(map[string](prometheus.Gauge)),
+		gaugeJobsElapsedMap: make(map[string](prometheus.Gauge)),
+		gaugeJobsNCPUSMap:   make(map[string](prometheus.Gauge)),
+		gaugeJobsVMEMOMap:   make(map[string](prometheus.Gauge)),
+		gaugeJobsSUBMITMap:  make(map[string](prometheus.Gauge)),
+		gaugePartsAvailMap:  make(map[string](prometheus.Gauge)),
+		gaugePartsIdleMap:   make(map[string](prometheus.Gauge)),
+		gaugePartsAllocMap:  make(map[string](prometheus.Gauge)),
+		gaugePartsTotalMap:  make(map[string](prometheus.Gauge)),
+		sshClient:           nil,
+		trackedJobs:         make(trackedList, 0),
+		trackedPartitions:   make(trackedList, 0),
 	}
 
 	switch authmethod := sshAuthMethod; authmethod {
@@ -135,66 +163,13 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
-	newerSlurmCollector.gaugeOptsMap["JobStatus"] = prometheus.GaugeOpts{
-		name: "slurm_jobstatus",
-		"Current status of the job",
-		[]string{
-			"job_id", "username", "job_name", "partition",
-		},
-		nil,
-	}
-
-	newerSlurmCollector.descPtrMap["JobExitStatus1"] = prometheus.NewDesc(
-		"slurm_jobexitstatus1",
-		"Exit status 1 of the job",
-		[]string{
-			"job_id", "username", "job_name", "job_status", "partition",
-		},
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["JobExitStatus2"] = prometheus.NewDesc(
-		"slurm_jobexitstatus2",
-		"Exit status 1 of the job",
-		[]string{
-			"job_id", "username", "job_name", "job_status", "partition",
-		},
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["JobWallTime"] = prometheus.NewDesc(
-		"slurm_jobwalltime",
-		"Walltime of the job",
-		[]string{
-			"job_id", "username", "job_name", "job_status", "partition",
-		},
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["JobnumCPUs"] = prometheus.NewDesc(
-		"slurm_jobncpus",
-		"Number of CPUS assigned to the job",
-		[]string{
-			"job_id", "username", "job_name", "job_status", "partition",
-		},
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["partition_nodes"] = prometheus.NewDesc(
-		"slurm_partitionnodes",
-		"Nodes in each partition",
-		[]string{
-			"partition", "availability", "state",
-		},
-		nil,
-	)
 	var err error
 	newerSlurmCollector.timeZone, err = time.LoadLocation(timeZone)
 	if err != nil {
 		newerSlurmCollector.timeZone, _ = time.LoadLocation("Local")
 		log.Warningln("Did not recognize time zone, set 'Local' timezone instead")
 	}
-
+	newerSlurmCollector.lasttime = time.Now()
 	return newerSlurmCollector
 }
 
@@ -218,6 +193,7 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 
 	sc.collectAcct(ch)
+	sc.collectInfo(ch)
 
 	err = sc.sshClient.Close()
 	if err != nil {
