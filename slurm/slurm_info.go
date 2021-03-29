@@ -56,7 +56,7 @@ func (sc *SlurmCollector) collectInfo(ch chan<- prometheus.Metric) {
 
 	// wait for stdout to fill (it is being filled async by ssh)
 	time.Sleep(1000 * time.Millisecond)
-	inactivePartitions := sc.trackedPartitions
+
 	nextLine := nextLineIterator(sshSession.OutBuffer, sinfoLineParser)
 	for fields, err := nextLine(); err == nil; fields, err = nextLine() {
 		// check the line is correctly parsed
@@ -65,66 +65,40 @@ func (sc *SlurmCollector) collectInfo(ch chan<- prometheus.Metric) {
 			continue
 		}
 		partition := fields[iPARTITION]
-
-		if _, ok := sc.gaugePartsTotalMap[partition]; !ok {
-
-			sc.trackedPartitions = append(sc.trackedPartitions, partition)
-
-			var const_Labels = map[string]string{
-				"partition": partition,
-			}
-
-			sc.gaugePartsAvailMap[partition] = prometheus.NewGauge(prometheus.GaugeOpts{
-				Namespace:   "Slurm",
-				Subsystem:   "Partition",
-				Name:        "Availability",
-				Help:        "Availability of the partition",
-				ConstLabels: const_Labels,
-			})
-
-			sc.gaugePartsIdleMap[partition] = prometheus.NewGauge(prometheus.GaugeOpts{
-				Namespace:   "Slurm",
-				Subsystem:   "Partition",
-				Name:        "Idle",
-				Help:        "Number of idle nodes in the partition",
-				ConstLabels: const_Labels,
-			})
-
-			sc.gaugePartsAllocMap[partition] = prometheus.NewGauge(prometheus.GaugeOpts{
-				Namespace:   "Slurm",
-				Subsystem:   "Partition",
-				Name:        "Allocated",
-				Help:        "Number of allocated nodes in the partition",
-				ConstLabels: const_Labels,
-			})
-
-			sc.gaugePartsTotalMap[partition] = prometheus.NewGauge(prometheus.GaugeOpts{
-				Namespace:   "Slurm",
-				Subsystem:   "Partition",
-				Name:        "Total",
-				Help:        "Number of total nodes in the partition",
-				ConstLabels: const_Labels,
-			})
-
-		} else {
-			inactivePartitions.remove(partition)
-		}
-
+		availability, _ := PartitionStateDict[fields[iPARTITION]]
 		idle, allocated, total, err := parseNodes(fields[iSTATES])
 
 		if err != nil {
 			log.Warnf(err.Error())
 		}
 
-		sc.gaugePartsAvailMap[partition].Set(float64(PartitionStateDict[fields[iAVAIL]]))
-		sc.gaugePartsIdleMap[partition].Set(idle)
-		sc.gaugePartsAllocMap[partition].Set(allocated)
-		sc.gaugePartsTotalMap[partition].Set(total)
+		ch <- prometheus.MustNewConstMetric(
+			sc.descPtrMap["PartAvai"],
+			prometheus.GaugeValue,
+			float64(availability),
+			partition,
+		)
 
-		ch <- sc.gaugePartsAvailMap[partition]
-		ch <- sc.gaugePartsIdleMap[partition]
-		ch <- sc.gaugePartsAllocMap[partition]
-		ch <- sc.gaugePartsTotalMap[partition]
+		ch <- prometheus.MustNewConstMetric(
+			sc.descPtrMap["PartIdle"],
+			prometheus.GaugeValue,
+			float64(idle),
+			partition,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			sc.descPtrMap["PartAlloc"],
+			prometheus.GaugeValue,
+			float64(allocated),
+			partition,
+		)
+
+		ch <- prometheus.MustNewConstMetric(
+			sc.descPtrMap["PartTotal"],
+			prometheus.GaugeValue,
+			float64(total),
+			partition,
+		)
 
 		// send num of nodes per state and partition
 
@@ -151,8 +125,8 @@ func parseNodes(ns string) (float64, float64, float64, error) {
 	if len(nodesByStatus) != 4 {
 		return 0, 0, 0, errors.New("Could not parse nodes: " + ns)
 	}
-	idle, _ := strconv.ParseFloat(nodesByStatus[1], 64)
 	alloc, _ := strconv.ParseFloat(nodesByStatus[0], 64)
+	idle, _ := strconv.ParseFloat(nodesByStatus[1], 64)
 	total, _ := strconv.ParseFloat(nodesByStatus[3], 64)
 	return idle, alloc, total, nil
 }

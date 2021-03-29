@@ -3,26 +3,26 @@ package pbs
 import (
 	"bytes"
 	"errors"
+	"hpc_exporter/ssh"
 	"io"
 	"strconv"
 	"strings"
 	"time"
-	"hpc_exporter/ssh"
-	
+
 	"github.com/prometheus/client_golang/prometheus"
 
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	sCOMPLETED	= iota
-	sEXITING		= iota
-	sHELD			= iota
-	sQUEUED		= iota
-	sRUNNING		= iota
-	sMOVING		= iota
-	sWAITING		= iota
-	sSUSPENDED	= iota
+	pCOMPLETED = iota
+	pEXITING
+	pHELD
+	pQUEUED
+	pRUNNING
+	pMOVING
+	pWAITING
+	pSUSPENDED
 )
 
 /*
@@ -40,48 +40,47 @@ const (
 
 // StatusDict maps string status with its int values
 var StatusDict = map[string]int{
-	"C":	sCOMPLETED,
-	"E":	sEXITING,
-	"H":	sHELD,
-	"Q":	sQUEUED,
-	"R":	sRUNNING,
-	"T":	sMOVING,
-	"W":	sWAITING,
-	"S":	sSUSPENDED,
+	"C": pCOMPLETED,
+	"E": pEXITING,
+	"H": pHELD,
+	"Q": pQUEUED,
+	"R": pRUNNING,
+	"T": pMOVING,
+	"W": pWAITING,
+	"S": pSUSPENDED,
 }
 
-type CollectFunc 		func(ch chan<- prometheus.Metric)
+type CollectFunc func(ch chan<- prometheus.Metric)
 
-type jobDetailsMap	map[string](string)
+type jobDetailsMap map[string](string)
 
 type PBSCollector struct {
-	
-	descPtrMap			map[string](*prometheus.Desc)
-		
+	descPtrMap map[string](*prometheus.Desc)
+
 	sshConfig         *ssh.SSHConfig
 	sshClient         *ssh.SSHClient
 	timeZone          *time.Location
-	targetJobIdsList	[]string
+	targetJobIdsList  []string
 	alreadyRegistered []string
-//	lasttime          time.Time
-	
-	jobsMap				map[string](jobDetailsMap)
+	//	lasttime          time.Time
+
+	jobsMap map[string](jobDetailsMap)
 }
 
 func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *PBSCollector {
-	newerPBSCollector := &PBSCollector {	
-		descPtrMap:				make(map[string](*prometheus.Desc)),
-		sshClient:				nil,
-		alreadyRegistered:	make([]string, 0),
+	newerPBSCollector := &PBSCollector{
+		descPtrMap:        make(map[string](*prometheus.Desc)),
+		sshClient:         nil,
+		alreadyRegistered: make([]string, 0),
 	}
-	
+
 	switch authmethod := sshAuthMethod; authmethod {
-		case "keypair":
-			newerPBSCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(sshUser, host, 22, sshPrivKey, sshKnownHosts)
-		case "password":
-			newerPBSCollector.sshConfig = ssh.NewSSHConfigByPassword(sshUser, sshPass, host, 22)
-		default:
-			log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
+	case "keypair":
+		newerPBSCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(sshUser, host, 22, sshPrivKey, sshKnownHosts)
+	case "password":
+		newerPBSCollector.sshConfig = ssh.NewSSHConfigByPassword(sshUser, sshPass, host, 22)
+	default:
+		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
 	newerPBSCollector.descPtrMap["userJobState"] = prometheus.NewDesc(
@@ -92,7 +91,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		},
 		nil,
 	)
-	
+
 	newerPBSCollector.descPtrMap["userJobExitStatus"] = prometheus.NewDesc(
 		"pbs_qstat_u_exitstatus",
 		"user job exit status",
@@ -101,7 +100,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		},
 		nil,
 	)
-	
+
 	newerPBSCollector.descPtrMap["userJobTotalRuntime"] = prometheus.NewDesc(
 		"pbs_qstat_u_totalruntime",
 		"user job total runtime in seconds",
@@ -111,7 +110,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		},
 		nil,
 	)
-	
+
 	newerPBSCollector.descPtrMap["userJobResourcesWallTime"] = prometheus.NewDesc(
 		"pbs_qstat_u_consumedwalltime",
 		"user job consumed walltime in seconds",
@@ -121,7 +120,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		},
 		nil,
 	)
-	
+
 	newerPBSCollector.descPtrMap["userJobResourcesCpuTime"] = prometheus.NewDesc(
 		"pbs_qstat_u_consumedcputime",
 		"user job consumed cputime in seconds",
@@ -131,7 +130,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		},
 		nil,
 	)
-	
+
 	newerPBSCollector.descPtrMap["userJobResourcesPhysMem"] = prometheus.NewDesc(
 		"pbs_qstat_u_consumedpmem",
 		"user job consumed pyhsical memory",
@@ -140,7 +139,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		},
 		nil,
 	)
-	
+
 	newerPBSCollector.descPtrMap["userJobResourcesVirtMem"] = prometheus.NewDesc(
 		"pbs_qstat_u_consumedvmem",
 		"user job consumed virtual memory",
@@ -148,22 +147,22 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 			"job_id", "username", "job_name", "job_state", "exit_status", "units",
 		},
 		nil,
-	)		
+	)
 
-/*
-	var err error
-	newerPBSCollector.timeZone, err = time.LoadLocation(timeZone)
-	if err != nil {
-		log.Fatalln(err.Error())
-	}
-	newerPBSCollector.setLastTime()
-*/
+	/*
+		var err error
+		newerPBSCollector.timeZone, err = time.LoadLocation(timeZone)
+		if err != nil {
+			log.Fatalln(err.Error())
+		}
+		newerPBSCollector.setLastTime()
+	*/
 
-	if (targetJobIds != "") {
+	if targetJobIds != "" {
 		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
-		newerPBSCollector.targetJobIdsList = strings.Split(targetJobIds,",")
+		newerPBSCollector.targetJobIdsList = strings.Split(targetJobIds, ",")
 	}
-	log.Infof("Target jobs, if specified: %s %d",newerPBSCollector.targetJobIdsList,len(newerPBSCollector.targetJobIdsList))
+	log.Infof("Target jobs, if specified: %s %d", newerPBSCollector.targetJobIdsList, len(newerPBSCollector.targetJobIdsList))
 	return newerPBSCollector
 }
 
@@ -172,7 +171,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 func (sc *PBSCollector) Describe(ch chan<- *prometheus.Desc) {
 	for _, element := range sc.descPtrMap {
 		ch <- element
-   }
+	}
 }
 
 // Collect read the values of the metrics and
@@ -185,7 +184,7 @@ func (sc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("Creating SSH client: %s", err.Error())
 		return
 	}
-	
+
 	sc.collectQstat(ch)
 
 	err = sc.sshClient.Close()

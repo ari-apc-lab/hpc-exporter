@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"errors"
 	"io"
+	"strconv"
+	"strings"
 
-	//	"strconv"
 	"hpc_exporter/ssh"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -117,41 +117,19 @@ type jobDetailsMap map[string](string)
 type trackedList []string
 
 type SlurmCollector struct {
-	gaugeJobsStatusMap  map[string](prometheus.Gauge)
-	gaugeJobsElapsedMap map[string](prometheus.Gauge)
-	gaugeJobsNCPUSMap   map[string](prometheus.Gauge)
-	gaugeJobsVMEMOMap   map[string](prometheus.Gauge)
-	gaugeJobsSUBMITMap  map[string](prometheus.Gauge)
-	gaugePartsAvailMap  map[string](prometheus.Gauge)
-	gaugePartsIdleMap   map[string](prometheus.Gauge)
-	gaugePartsAllocMap  map[string](prometheus.Gauge)
-	gaugePartsTotalMap  map[string](prometheus.Gauge)
+	descPtrMap map[string](*prometheus.Desc)
 
-	sshConfig         *ssh.SSHConfig
-	sshClient         *ssh.SSHClient
-	timeZone          *time.Location
-	trackedJobs       trackedList
-	trackedPartitions trackedList
-	lasttime          time.Time
-
-	jobsMap map[string](jobDetailsMap)
+	sshConfig   *ssh.SSHConfig
+	sshClient   *ssh.SSHClient
+	runningJobs trackedList
+	jobsMap     map[string](jobDetailsMap)
 }
 
 func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
-
-		gaugeJobsStatusMap:  make(map[string](prometheus.Gauge)),
-		gaugeJobsElapsedMap: make(map[string](prometheus.Gauge)),
-		gaugeJobsNCPUSMap:   make(map[string](prometheus.Gauge)),
-		gaugeJobsVMEMOMap:   make(map[string](prometheus.Gauge)),
-		gaugeJobsSUBMITMap:  make(map[string](prometheus.Gauge)),
-		gaugePartsAvailMap:  make(map[string](prometheus.Gauge)),
-		gaugePartsIdleMap:   make(map[string](prometheus.Gauge)),
-		gaugePartsAllocMap:  make(map[string](prometheus.Gauge)),
-		gaugePartsTotalMap:  make(map[string](prometheus.Gauge)),
-		sshClient:           nil,
-		trackedJobs:         make(trackedList, 0),
-		trackedPartitions:   make(trackedList, 0),
+		descPtrMap:  make(map[string](*prometheus.Desc)),
+		sshClient:   nil,
+		runningJobs: make(trackedList, 0),
 	}
 
 	switch authmethod := sshAuthMethod; authmethod {
@@ -163,13 +141,86 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
-	var err error
-	newerSlurmCollector.timeZone, err = time.LoadLocation(timeZone)
-	if err != nil {
-		newerSlurmCollector.timeZone, _ = time.LoadLocation("Local")
-		log.Warningln("Did not recognize time zone, set 'Local' timezone instead")
-	}
-	newerSlurmCollector.lasttime = time.Now()
+	newerSlurmCollector.descPtrMap["JobState"] = prometheus.NewDesc(
+		"slurm_job_state",
+		"job current state",
+		[]string{
+			"job_id", "username", "job_name", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobWalltime"] = prometheus.NewDesc(
+		"slurm_job_walltime",
+		"job current walltime",
+		[]string{
+			"job_id", "username", "job_name", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobNCPUs"] = prometheus.NewDesc(
+		"slurm_job_ncpus",
+		"job ncpus assigned",
+		[]string{
+			"job_id", "username", "job_name", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobVMEM"] = prometheus.NewDesc(
+		"slurm_job_vmem",
+		"job average virtual memory consumed",
+		[]string{
+			"job_id", "username", "job_name", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobQueued"] = prometheus.NewDesc(
+		"slurm_job_queued",
+		"job time in the queue",
+		[]string{
+			"job_id", "username", "job_name", "partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["PartAvai"] = prometheus.NewDesc(
+		"slurm_partition_availability",
+		"partition availability",
+		[]string{
+			"partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["PartIdle"] = prometheus.NewDesc(
+		"slurm_partition_cores_idle",
+		"partition number of idle cores",
+		[]string{
+			"partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["PartAllo"] = prometheus.NewDesc(
+		"slurm_partition_cores_alloc",
+		"partition number of allocated cores",
+		[]string{
+			"partition",
+		},
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["PartTota"] = prometheus.NewDesc(
+		"slurm_partition_cores_total",
+		"partition number of total cores",
+		[]string{
+			"partition",
+		},
+		nil,
+	)
 	return newerSlurmCollector
 }
 
@@ -192,6 +243,7 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
+	sc.collectQueu(ch)
 	sc.collectAcct(ch)
 	sc.collectInfo(ch)
 
@@ -239,4 +291,45 @@ func nextLineIterator(buf io.Reader, parser func(string) []string) func() ([]str
 		}
 		return parsed, nil
 	}
+}
+
+func computeSlurmTime(timeField string) float64 {
+
+	split_walltime := strings.Split(timeField, ":")
+
+	walltime_dd := 0.0
+	walltime_hh := 0.0
+	walltime_mm := 0.0
+	walltime_ss := 0.0
+
+	switch numfields := len(split_walltime); numfields {
+	case 2:
+		walltime_mm, _ = strconv.ParseFloat(split_walltime[0], 64)
+		walltime_ss, _ = strconv.ParseFloat(split_walltime[1], 64)
+	case 3:
+		walltime_mm, _ = strconv.ParseFloat(split_walltime[1], 64)
+		walltime_ss, _ = strconv.ParseFloat(split_walltime[2], 64)
+		split_dh_walltime := strings.Split(split_walltime[0], "-")
+		switch innernumfields := len(split_dh_walltime); innernumfields {
+		case 1:
+			walltime_hh, _ = strconv.ParseFloat(split_dh_walltime[0], 64)
+		case 2:
+			walltime_dd, _ = strconv.ParseFloat(split_dh_walltime[0], 64)
+			walltime_hh, _ = strconv.ParseFloat(split_dh_walltime[1], 64)
+		}
+	default:
+		return 0.0
+	}
+
+	walltime := walltime_dd*86400.0 + walltime_hh*3600.0 + walltime_mm*60.0 + walltime_ss
+	return walltime
+}
+
+func notContains(slice trackedList, st string) bool {
+	for _, e := range slice {
+		if st == e {
+			return false
+		}
+	}
+	return true
 }
