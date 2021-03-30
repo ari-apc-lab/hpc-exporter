@@ -87,14 +87,14 @@ func (sc *SlurmCollector) collectInfo(ch chan<- prometheus.Metric) {
 		)
 
 		ch <- prometheus.MustNewConstMetric(
-			sc.descPtrMap["PartAlloc"],
+			sc.descPtrMap["PartAllo"],
 			prometheus.GaugeValue,
 			float64(allocated),
 			partition,
 		)
 
 		ch <- prometheus.MustNewConstMetric(
-			sc.descPtrMap["PartTotal"],
+			sc.descPtrMap["PartTota"],
 			prometheus.GaugeValue,
 			float64(total),
 			partition,
