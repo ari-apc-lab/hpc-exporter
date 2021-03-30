@@ -117,10 +117,6 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 			continue
 		}
 
-		if (len(sc.targetJobIdsList) > 0) && !(sc.jobIsTarget(fields[aJOBID])) {
-			continue
-		}
-
 		// get job details
 		jobdetails := sc.collectJobQstat(fields[aJOBID])
 		state, stateOk := StatusDict[fields[aS]]
@@ -234,15 +230,6 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 	}
 
 	log.Infof("Collected jobs: %d", collected)
-}
-
-func (sc *PBSCollector) jobIsTarget(fullJobId string) bool {
-	// Check whether a job found in the qstat response is a monitoring target
-	isTarget := false
-	for _, s := range sc.targetJobIdsList {
-		isTarget = isTarget || (s == fullJobId)
-	}
-	return isTarget
 }
 
 func qstatLineParser(line string) []string {

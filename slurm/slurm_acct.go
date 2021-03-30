@@ -16,6 +16,7 @@
 package slurm
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -37,14 +38,12 @@ const (
 	accFIELDS
 )
 
-const (
-	sacctCommand = "sacct -n -X -o \"JobIDRaw,JobName%20,User%15,Partition%10,State%14,AveVMSize%10,NCPUS%6,Submit%7,ElapsedRaw%7\" -S00:00:00 | grep -v 'PENDING' | uniq"
-)
-
 func (sc *SlurmCollector) collectAcct(ch chan<- prometheus.Metric) {
 	log.Debugln("Collecting Acct metrics...")
 	var collected uint
 
+	startTime := getstarttime(sc.sacctHistory)
+	sacctCommand := "sacct -n -X -o \"JobIDRaw,JobName%20,User%15,Partition%10,State%14,AveVMSize%10,NCPUS%6,Submit%23,ElapsedRaw%7\" -S " + startTime + " | grep -v 'PENDING' "
 	sshSession, err := sc.executeSSHCommand(sacctCommand)
 	if sshSession != nil {
 		defer sshSession.Close()
@@ -123,4 +122,19 @@ func sacctLineParser(line string) []string {
 	}
 
 	return fields
+}
+
+func getstarttime(days int) string {
+
+	start := time.Now().AddDate(0, 0, days)
+	hour := start.Hour()
+	minute := start.Minute()
+	second := start.Second()
+	day := start.Day()
+	month := start.Month()
+	year := start.Year()
+
+	str := fmt.Sprintf("%4d-%2d-%2dT%2d:%2d:%2d", year, month, day, hour, minute, second)
+
+	return str
 }

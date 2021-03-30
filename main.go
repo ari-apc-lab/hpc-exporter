@@ -55,16 +55,16 @@ var (
 		"Path to the SSH local known_hosts file including the remote frontend",
 	)
 	/*
-	countryTZ = flag.String(
-		"countrytz",
-		"Europe/Madrid",
-		"Country Time zone of the host, (e.g. \"Europe/Madrid\").",
-	)
+		countryTZ = flag.String(
+			"countrytz",
+			"Europe/Madrid",
+			"Country Time zone of the host, (e.g. \"Europe/Madrid\").",
+		)
 	*/
-	targetJobIds = flag.String(
-		"target-job-ids",
-		"",
-		"Comma-separated ids of the specific HPC jobs to monitor. Keep it unset to monitor all the jobs of the user.",
+	sacctHistory = flag.Int(
+		"sacctHistory",
+		5,
+		"Jobs reported will be the ones submitted this many days back. Default is 5",
 	)
 	logLevel = flag.String(
 		"log-level",
@@ -95,36 +95,36 @@ func main() {
 			log.Fatalln("A user must be provided to connect to a frontend remotely.")
 		}
 		switch authmethod := *sshAuthMethod; authmethod {
-			case "keypair":
-//				if (*sshPrivKey == "" || *sshKnownHosts == "") {
-				if (*sshPrivKey == "") {
-					flag.Usage()
-//					log.Fatalln("Paths to a private key and a known hosts file should be provided to connect to a frontend remotely using this authentication method.")
-					log.Fatalln("Path to a private key should be provided to connect to a frontend remotely using this authentication method.")
-				}
-				if (*sshKnownHosts == "") {
-					log.Infoln("Known hosts file is not mandatory but recommended.")
-				}
-			case "password":
-				if (*sshPass == "") {
-					flag.Usage()
-					log.Fatalln("A password should be provided to connect to a frontend remotely using this authentication method.")
-				}
-			default:
+		case "keypair":
+			//				if (*sshPrivKey == "" || *sshKnownHosts == "") {
+			if *sshPrivKey == "" {
 				flag.Usage()
-				log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
+				//					log.Fatalln("Paths to a private key and a known hosts file should be provided to connect to a frontend remotely using this authentication method.")
+				log.Fatalln("Path to a private key should be provided to connect to a frontend remotely using this authentication method.")
+			}
+			if *sshKnownHosts == "" {
+				log.Infoln("Known hosts file is not mandatory but recommended.")
+			}
+		case "password":
+			if *sshPass == "" {
+				flag.Usage()
+				log.Fatalln("A password should be provided to connect to a frontend remotely using this authentication method.")
+			}
+		default:
+			flag.Usage()
+			log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 		}
 	}
 
 	switch sched := *scheduler; sched {
-		case "pbs":
-			log.Debugf("Registering collector for scheduler %s", sched)
-			prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *targetJobIds))
-		case "slurm":
-			log.Debugf("Registering collector for scheduler %s", sched)
-			prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *targetJobIds))
-		default:
-			log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
+	case "pbs":
+		log.Debugf("Registering collector for scheduler %s", sched)
+		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, ""))
+	case "slurm":
+		log.Debugf("Registering collector for scheduler %s", sched)
+		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *sacctHistory))
+	default:
+		log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}
 
 	// Expose the registered metrics via HTTP.
@@ -132,4 +132,3 @@ func main() {
 	http.Handle("/metrics", promhttp.Handler())
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
-

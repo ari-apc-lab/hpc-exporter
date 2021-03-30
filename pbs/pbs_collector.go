@@ -60,14 +60,13 @@ type PBSCollector struct {
 	sshConfig         *ssh.SSHConfig
 	sshClient         *ssh.SSHClient
 	timeZone          *time.Location
-	targetJobIdsList  []string
 	alreadyRegistered []string
 	//	lasttime          time.Time
 
 	jobsMap map[string](jobDetailsMap)
 }
 
-func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string) *PBSCollector {
 	newerPBSCollector := &PBSCollector{
 		descPtrMap:        make(map[string](*prometheus.Desc)),
 		sshClient:         nil,
@@ -158,11 +157,6 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		newerPBSCollector.setLastTime()
 	*/
 
-	if targetJobIds != "" {
-		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
-		newerPBSCollector.targetJobIdsList = strings.Split(targetJobIds, ",")
-	}
-	log.Infof("Target jobs, if specified: %s %d", newerPBSCollector.targetJobIdsList, len(newerPBSCollector.targetJobIdsList))
 	return newerPBSCollector
 }
 

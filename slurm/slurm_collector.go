@@ -117,19 +117,20 @@ type jobDetailsMap map[string](string)
 type trackedList []string
 
 type SlurmCollector struct {
-	descPtrMap map[string](*prometheus.Desc)
-
-	sshConfig   *ssh.SSHConfig
-	sshClient   *ssh.SSHClient
-	runningJobs trackedList
-	jobsMap     map[string](jobDetailsMap)
+	descPtrMap   map[string](*prometheus.Desc)
+	sacctHistory int
+	sshConfig    *ssh.SSHConfig
+	sshClient    *ssh.SSHClient
+	runningJobs  trackedList
+	jobsMap      map[string](jobDetailsMap)
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, targetJobIds string) *SlurmCollector {
+func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, sacct_History int) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
-		descPtrMap:  make(map[string](*prometheus.Desc)),
-		sshClient:   nil,
-		runningJobs: make(trackedList, 0),
+		descPtrMap:   make(map[string](*prometheus.Desc)),
+		sacctHistory: sacct_History,
+		sshClient:    nil,
+		runningJobs:  make(trackedList, 0),
 	}
 
 	switch authmethod := sshAuthMethod; authmethod {
