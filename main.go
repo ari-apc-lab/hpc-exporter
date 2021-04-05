@@ -66,6 +66,11 @@ var (
 		5,
 		"Jobs reported will be the ones submitted this many days back. Default is 5",
 	)
+	scrapeInterval = flag.Int(
+		"scrape-interval",
+		5,
+		"How often (in seconds) SSH commands will be executed on the HPC frontend to update metrics",
+	)
 	logLevel = flag.String(
 		"log-level",
 		"error",
@@ -122,7 +127,7 @@ func main() {
 		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, ""))
 	case "slurm":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *sacctHistory))
+		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *sacctHistory, *scrapeInterval))
 	default:
 		log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}

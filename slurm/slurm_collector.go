@@ -6,6 +6,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"hpc_exporter/ssh"
 
@@ -117,20 +118,32 @@ type jobDetailsMap map[string](string)
 type trackedList []string
 
 type SlurmCollector struct {
-	descPtrMap   map[string](*prometheus.Desc)
-	sacctHistory int
-	sshConfig    *ssh.SSHConfig
-	sshClient    *ssh.SSHClient
-	runningJobs  trackedList
-	jobsMap      map[string](jobDetailsMap)
+	descPtrMap     map[string](*prometheus.Desc)
+	sacctHistory   int
+	sshConfig      *ssh.SSHConfig
+	sshClient      *ssh.SSHClient
+	runningJobs    trackedList
+	trackedJobs    map[string]bool
+	jobsMap        map[string](jobDetailsMap)
+	scrapeInterval int
+	lastScrape     time.Time
+	jobMetrics     map[string](map[string](float64))
+	parMetrics     map[string](map[string](float64))
+	labels         map[string](map[string](string))
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, sacct_History int) *SlurmCollector {
+func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
-		descPtrMap:   make(map[string](*prometheus.Desc)),
-		sacctHistory: sacct_History,
-		sshClient:    nil,
-		runningJobs:  make(trackedList, 0),
+		descPtrMap:     make(map[string](*prometheus.Desc)),
+		sacctHistory:   sacct_History,
+		sshClient:      nil,
+		runningJobs:    make(trackedList, 0),
+		trackedJobs:    make(map[string]bool),
+		scrapeInterval: scrapeInterval,
+		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2) * scrapeInterval))),
+		jobMetrics:     make(map[string](map[string](float64))),
+		parMetrics:     make(map[string](map[string](float64))),
+		labels:         make(map[string](map[string](string))),
 	}
 
 	switch authmethod := sshAuthMethod; authmethod {
@@ -142,84 +155,81 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
+	jobtags := []string{
+		"job_id", "username", "job_name", "partition",
+	}
+
+	partitiontags := []string{
+		"partition",
+	}
+
 	newerSlurmCollector.descPtrMap["JobState"] = prometheus.NewDesc(
 		"slurm_job_state",
 		"job current state",
-		[]string{
-			"job_id", "username", "job_name", "partition",
-		},
+		jobtags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["JobWalltime"] = prometheus.NewDesc(
 		"slurm_job_walltime",
 		"job current walltime",
-		[]string{
-			"job_id", "username", "job_name", "partition",
-		},
+		jobtags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["JobNCPUs"] = prometheus.NewDesc(
 		"slurm_job_ncpus",
 		"job ncpus assigned",
-		[]string{
-			"job_id", "username", "job_name", "partition",
-		},
+		jobtags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["JobVMEM"] = prometheus.NewDesc(
-		"slurm_job_vmem",
-		"job average virtual memory consumed",
-		[]string{
-			"job_id", "username", "job_name", "partition",
-		},
+		"slurm_job_maxvmem",
+		"job maximum virtual memory consumed",
+		jobtags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["JobQueued"] = prometheus.NewDesc(
 		"slurm_job_queued",
 		"job time in the queue",
-		[]string{
-			"job_id", "username", "job_name", "partition",
-		},
+		jobtags,
+		nil,
+	)
+
+	newerSlurmCollector.descPtrMap["JobRSS"] = prometheus.NewDesc(
+		"slurm_job_maxrss",
+		"job maximum Resident Set Size",
+		jobtags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["PartAvai"] = prometheus.NewDesc(
 		"slurm_partition_availability",
 		"partition availability",
-		[]string{
-			"partition",
-		},
+		partitiontags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["PartIdle"] = prometheus.NewDesc(
 		"slurm_partition_cores_idle",
 		"partition number of idle cores",
-		[]string{
-			"partition",
-		},
+		partitiontags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["PartAllo"] = prometheus.NewDesc(
 		"slurm_partition_cores_alloc",
 		"partition number of allocated cores",
-		[]string{
-			"partition",
-		},
+		partitiontags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["PartTota"] = prometheus.NewDesc(
 		"slurm_partition_cores_total",
 		"partition number of total cores",
-		[]string{
-			"partition",
-		},
+		partitiontags,
 		nil,
 	)
 	return newerSlurmCollector
@@ -244,26 +254,33 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	sc.collectQueu(ch)
-	sc.collectAcct(ch)
-	sc.collectInfo(ch)
+	if time.Now().Sub(sc.lastScrape) < time.Duration(sc.scrapeInterval) {
+		if session, err := sc.openSession(); err != nil {
+			defer session.Close()
+			sc.trackedJobs = make(map[string]bool)
+			err1 := sc.collectQueu(session)
+			err2 := sc.collectAcct(session)
+			err3 := sc.collectInfo(session)
+			if err1 != nil && err2 != nil && err3 != nil {
+				sc.lastScrape = time.Now()
+			}
+			sc.delJobs()
+		} else {
+			log.Errorf(err.Error())
+			session.Close()
+		}
 
-	err = sc.sshClient.Close()
-	if err != nil {
-		log.Errorf("Closing SSH client: %s", err.Error())
 	}
+
+	sc.updateMetrics(ch)
+
 }
 
-func (sc *SlurmCollector) executeSSHCommand(cmd string) (*ssh.SSHSession, error) {
-	command := &ssh.SSHCommand{
-		Path: cmd,
-		// Env:    []string{"LC_DIR=/usr"},
-	}
+func (sc *SlurmCollector) openSession() (*ssh.SSHSession, error) {
 
 	var outb, errb bytes.Buffer
 	session, err := sc.sshClient.OpenSession(nil, &outb, &errb)
 	if err == nil {
-		err = session.RunCommand(command)
 		return session, err
 	} else {
 		log.Errorf("Opening SSH session: %s", err.Error())
@@ -326,11 +343,66 @@ func computeSlurmTime(timeField string) float64 {
 	return walltime
 }
 
-func notContains(slice trackedList, st string) bool {
+func notContains(slice trackedList, s string) bool {
 	for _, e := range slice {
-		if st == e {
+		if s == e {
 			return false
 		}
 	}
 	return true
+}
+
+func parseMem(s string) float64 {
+	if f, e := strconv.ParseFloat(s, 64); e == nil {
+		return f * 10e-6
+	}
+	num, _ := strconv.ParseFloat(s[:len(s)-1], 64)
+	switch c := s[len(s)]; c {
+	case 'K', 'k':
+		return num * 10e-3
+	case 'M', 'm':
+		return num
+	case 'G', 'g':
+		return num * 10e3
+	}
+	return num
+
+}
+
+func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
+
+	for metric, elem := range sc.jobMetrics {
+
+		for jobid, value := range elem {
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap[metric],
+				prometheus.GaugeValue,
+				value,
+				jobid, sc.labels["JobName"][jobid], sc.labels["JobUser"][jobid], sc.labels["JobPartition"][jobid],
+			)
+		}
+	}
+
+	for metric, elem := range sc.parMetrics {
+
+		for partition, value := range elem {
+			ch <- prometheus.MustNewConstMetric(
+				sc.descPtrMap[metric],
+				prometheus.GaugeValue,
+				value,
+				partition,
+			)
+		}
+	}
+
+}
+
+func (sc *SlurmCollector) delJobs() {
+	for job, tracked := range sc.trackedJobs {
+		if !tracked {
+			for _, elems := range sc.jobMetrics {
+				delete(elems, job)
+			}
+		}
+	}
 }

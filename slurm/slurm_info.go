@@ -17,11 +17,12 @@ package slurm
 
 import (
 	"errors"
+	"fmt"
+	"hpc_exporter/ssh"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,31 +34,29 @@ const (
 )
 
 const (
-	infoCommand   = "sinfo -h -o \"%20R %.5a %.20F\" | uniq"
 	iSTATESNUMBER = 4
 )
 
-var iSTATESNAMES = [4]string{"allocated", "idle", "other", "total"}
-
-func (sc *SlurmCollector) collectInfo(ch chan<- prometheus.Metric) {
+func (sc *SlurmCollector) collectInfo(session *ssh.SSHSession) error {
 	log.Debugln("Collecting Info metrics...")
 	var collected uint
 
 	// execute the command
-	log.Debugln(infoCommand)
-	sshSession, err := sc.executeSSHCommand(infoCommand)
-	if sshSession != nil {
-		defer sshSession.Close()
+	infoCommand := &ssh.SSHCommand{
+		Path: "sinfo -h -o \"%20R %.5a %.20F\" | uniq",
 	}
+	log.Debugln(infoCommand)
+	err := session.RunCommand(infoCommand)
+
 	if err != nil {
-		log.Warnln(err.Error())
-		return
+		log.Errorf("sinfo: %s", err.Error())
+		return err
 	}
 
 	// wait for stdout to fill (it is being filled async by ssh)
 	time.Sleep(1000 * time.Millisecond)
 
-	nextLine := nextLineIterator(sshSession.OutBuffer, sinfoLineParser)
+	nextLine := nextLineIterator(session.OutBuffer, sinfoLineParser)
 	for fields, err := nextLine(); err == nil; fields, err = nextLine() {
 		// check the line is correctly parsed
 		if err != nil {
@@ -65,47 +64,31 @@ func (sc *SlurmCollector) collectInfo(ch chan<- prometheus.Metric) {
 			continue
 		}
 		partition := fields[iPARTITION]
-		availability, _ := PartitionStateDict[fields[iPARTITION]]
+		availability, errb := PartitionStateDict[fields[iAVAIL]]
+
+		if !errb {
+			err := fmt.Errorf("Error when parsing partition availability: %s", fields[iAVAIL])
+			log.Warnf(err.Error())
+			return err
+		}
+
 		idle, allocated, total, err := parseNodes(fields[iSTATES])
 
 		if err != nil {
 			log.Warnf(err.Error())
+			return err
 		}
 
-		ch <- prometheus.MustNewConstMetric(
-			sc.descPtrMap["PartAvai"],
-			prometheus.GaugeValue,
-			float64(availability),
-			partition,
-		)
-
-		ch <- prometheus.MustNewConstMetric(
-			sc.descPtrMap["PartIdle"],
-			prometheus.GaugeValue,
-			float64(idle),
-			partition,
-		)
-
-		ch <- prometheus.MustNewConstMetric(
-			sc.descPtrMap["PartAllo"],
-			prometheus.GaugeValue,
-			float64(allocated),
-			partition,
-		)
-
-		ch <- prometheus.MustNewConstMetric(
-			sc.descPtrMap["PartTota"],
-			prometheus.GaugeValue,
-			float64(total),
-			partition,
-		)
-
-		// send num of nodes per state and partition
+		sc.jobMetrics["PartAvai"][partition] = float64(availability)
+		sc.jobMetrics["PartIdle"][partition] = float64(idle)
+		sc.jobMetrics["PartAllo"][partition] = float64(allocated)
+		sc.jobMetrics["PartTota"][partition] = float64(total)
 
 		collected++
 
 	}
 	log.Infof("%d partition info collected", collected)
+	return nil
 }
 
 func sinfoLineParser(line string) []string {
