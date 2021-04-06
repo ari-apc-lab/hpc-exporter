@@ -45,6 +45,7 @@ func (sc *SlurmCollector) collectQueu() {
 	defer closeSession(session)
 
 	if err != nil {
+
 		log.Errorf("Error opening session for squeue: %s ", err.Error())
 		return
 	}
@@ -55,7 +56,13 @@ func (sc *SlurmCollector) collectQueu() {
 	err = session.RunCommand(queueCommand)
 
 	if err != nil {
+		err_chunk, err2 := session.ErrBuffer.ReadString('\n')
+		err_str := err_chunk
+		for ; err2 == nil; err_str += err_chunk {
+			err_chunk, err2 = session.ErrBuffer.ReadString('\n')
+		}
 		log.Errorf("squeue command failed: %s", err.Error())
+		log.Debugf("Error was: %s", err_str)
 		return
 	}
 
@@ -78,7 +85,7 @@ func (sc *SlurmCollector) collectQueu() {
 			sc.trackedJobs[jobid] = true
 			sc.labels["JobName"][jobid] = fields[qNAME]
 			sc.labels["JobUser"][jobid] = fields[qUSER]
-			sc.labels["JobPartition"][jobid] = fields[qPARTITION]
+			sc.labels["JobPart"][jobid] = fields[qPARTITION]
 
 			sc.jobMetrics["JobState"][jobid] = float64(LongStatusDict[state])
 			sc.jobMetrics["JobWalltime"][jobid] = computeSlurmTime(fields[qWALLTIME])

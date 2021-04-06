@@ -56,7 +56,15 @@ func (sc *SlurmCollector) collectAcct() {
 
 	err = session.RunCommand(sacctCommand)
 	if err != nil {
+
+		err_chunk, err2 := session.ErrBuffer.ReadString('\n')
+		err_str := err_chunk
+		for ; err2 == nil; err_str += err_chunk {
+			err_chunk, err2 = session.ErrBuffer.ReadString('\n')
+		}
+
 		log.Errorf("sacct command failed: %s", err.Error())
+		log.Debugf("Error was: %s", err_str)
 		return
 	}
 
@@ -80,7 +88,7 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.trackedJobs[jobid] = true
 		sc.labels["JobName"][jobid] = fields[accNAME]
 		sc.labels["JobUser"][jobid] = fields[accUSERNAME]
-		sc.labels["JobPartition"][jobid] = fields[accPARTITION]
+		sc.labels["JobPart"][jobid] = fields[accPARTITION]
 
 		submit, _ := time.Parse("RFC3339", fields[accSUBMIT]+"Z")
 

@@ -145,7 +145,19 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		parMetrics:     make(map[string](map[string](float64))),
 		labels:         make(map[string](map[string](string))),
 	}
-
+	newerSlurmCollector.jobMetrics["JobState"] = make(map[string]float64)
+	newerSlurmCollector.jobMetrics["JobWalltime"] = make(map[string]float64)
+	newerSlurmCollector.jobMetrics["JobNCPUs"] = make(map[string]float64)
+	newerSlurmCollector.jobMetrics["JobVMEM"] = make(map[string]float64)
+	newerSlurmCollector.jobMetrics["JobQueued"] = make(map[string]float64)
+	newerSlurmCollector.jobMetrics["JobRSS"] = make(map[string]float64)
+	newerSlurmCollector.parMetrics["PartAvai"] = make(map[string]float64)
+	newerSlurmCollector.parMetrics["PartIdle"] = make(map[string]float64)
+	newerSlurmCollector.parMetrics["PartAllo"] = make(map[string]float64)
+	newerSlurmCollector.parMetrics["PartTota"] = make(map[string]float64)
+	newerSlurmCollector.labels["JobName"] = make(map[string]string)
+	newerSlurmCollector.labels["JobUser"] = make(map[string]string)
+	newerSlurmCollector.labels["JobPart"] = make(map[string]string)
 	switch authmethod := sshAuthMethod; authmethod {
 	case "keypair":
 		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(sshUser, host, 22, sshPrivKey, sshKnownHosts)
@@ -376,7 +388,7 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 				sc.descPtrMap[metric],
 				prometheus.GaugeValue,
 				value,
-				jobid, sc.labels["JobName"][jobid], sc.labels["JobUser"][jobid], sc.labels["JobPartition"][jobid],
+				jobid, sc.labels["JobName"][jobid], sc.labels["JobUser"][jobid], sc.labels["JobPart"][jobid],
 			)
 		}
 	}

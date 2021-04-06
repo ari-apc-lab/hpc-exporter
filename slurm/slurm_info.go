@@ -54,7 +54,13 @@ func (sc *SlurmCollector) collectInfo() {
 	err = session.RunCommand(infoCommand)
 
 	if err != nil {
+		err_chunk, err2 := session.ErrBuffer.ReadString('\n')
+		err_str := err_chunk
+		for ; err2 == nil; err_str += err_chunk {
+			err_chunk, err2 = session.ErrBuffer.ReadString('\n')
+		}
 		log.Errorf("sinfo command failed: %s", err.Error())
+		log.Debugf("Error was: %s", err_str)
 		return
 	}
 
