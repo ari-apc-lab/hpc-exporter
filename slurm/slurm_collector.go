@@ -253,10 +253,11 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Errorf("Creating SSH client: %s", err.Error())
 		return
 	}
-
-	if time.Now().Sub(sc.lastScrape) < time.Duration(sc.scrapeInterval) {
+	log.Debugf("Time since last scrape: %s seconds", time.Now().Sub(sc.lastScrape).Seconds())
+	if time.Now().Sub(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
 		if session, err := sc.openSession(); err != nil {
 			defer session.Close()
+			log.Infof("Collecting metrics from Slurm...")
 			sc.trackedJobs = make(map[string]bool)
 			err1 := sc.collectQueu(session)
 			err2 := sc.collectAcct(session)
@@ -370,6 +371,8 @@ func parseMem(s string) float64 {
 }
 
 func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
+
+	log.Infof("Refreshing exposed metrics")
 
 	for metric, elem := range sc.jobMetrics {
 

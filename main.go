@@ -68,7 +68,7 @@ var (
 	)
 	scrapeInterval = flag.Int(
 		"scrape-interval",
-		5,
+		300,
 		"How often (in seconds) SSH commands will be executed on the HPC frontend to update metrics",
 	)
 	logLevel = flag.String(
