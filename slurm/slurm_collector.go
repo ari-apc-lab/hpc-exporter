@@ -140,7 +140,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		runningJobs:    make(trackedList, 0),
 		trackedJobs:    make(map[string]bool),
 		scrapeInterval: scrapeInterval,
-		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2) * scrapeInterval))),
+		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * scrapeInterval)))),
 		jobMetrics:     make(map[string](map[string](float64))),
 		parMetrics:     make(map[string](map[string](float64))),
 		labels:         make(map[string](map[string](string))),
@@ -248,14 +248,15 @@ func (sc *SlurmCollector) Describe(ch chan<- *prometheus.Desc) {
 // It implements collector interface
 func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 	var err error
-	sc.sshClient, err = sc.sshConfig.NewClient()
-	if err != nil {
-		log.Errorf("Creating SSH client: %s", err.Error())
-		return
-	}
+
 	log.Debugf("Time since last scrape: %s seconds", time.Now().Sub(sc.lastScrape).Seconds())
 	if time.Now().Sub(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
-		if session, err := sc.openSession(); err != nil {
+		sc.sshClient, err = sc.sshConfig.NewClient()
+		if err != nil {
+			log.Errorf("Creating SSH client: %s", err.Error())
+			return
+		}
+		if session, err := sc.openSession(); err == nil {
 			defer session.Close()
 			log.Infof("Collecting metrics from Slurm...")
 			sc.trackedJobs = make(map[string]bool)
@@ -401,11 +402,15 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 }
 
 func (sc *SlurmCollector) delJobs() {
+	log.Debugf("Cleaning old jobs")
+	i := 0
 	for job, tracked := range sc.trackedJobs {
 		if !tracked {
 			for _, elems := range sc.jobMetrics {
 				delete(elems, job)
+				i++
 			}
 		}
 	}
+	log.Debugf("%d old jobs deleted", i)
 }
