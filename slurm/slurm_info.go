@@ -89,10 +89,10 @@ func (sc *SlurmCollector) collectInfo() {
 			return
 		}
 
-		sc.jobMetrics["PartAvai"][partition] = float64(availability)
-		sc.jobMetrics["PartIdle"][partition] = float64(idle)
-		sc.jobMetrics["PartAllo"][partition] = float64(allocated)
-		sc.jobMetrics["PartTota"][partition] = float64(total)
+		sc.parMetrics["PartAvai"][partition] = float64(availability)
+		sc.parMetrics["PartIdle"][partition] = float64(idle)
+		sc.parMetrics["PartAllo"][partition] = float64(allocated)
+		sc.parMetrics["PartTota"][partition] = float64(total)
 
 		collected++
 
