@@ -256,21 +256,15 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 			log.Errorf("Creating SSH client: %s", err.Error())
 			return
 		}
-		if session, err := sc.openSession(); err == nil {
-			defer session.Close()
-			log.Infof("Collecting metrics from Slurm...")
-			sc.trackedJobs = make(map[string]bool)
-			err1 := sc.collectQueu(session)
-			err2 := sc.collectAcct(session)
-			err3 := sc.collectInfo(session)
-			if err1 != nil && err2 != nil && err3 != nil {
-				sc.lastScrape = time.Now()
-			}
-			sc.delJobs()
-		} else {
-			log.Errorf(err.Error())
-			session.Close()
-		}
+
+		log.Infof("Collecting metrics from Slurm...")
+		sc.trackedJobs = make(map[string]bool)
+		sc.collectQueu()
+		sc.collectAcct()
+		sc.collectInfo()
+		sc.lastScrape = time.Now()
+
+		sc.delJobs()
 
 	}
 
@@ -413,4 +407,16 @@ func (sc *SlurmCollector) delJobs() {
 		}
 	}
 	log.Debugf("%d old jobs deleted", i)
+}
+
+func closeSession(s *ssh.SSHSession) {
+
+	log.Debugf("Closing session")
+
+	err := s.Close()
+	if err == nil {
+		log.Debugf("Session closed successfully")
+	} else {
+		log.Errorf("Session could not be closed properly: %s", err.Error())
+	}
 }

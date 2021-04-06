@@ -36,18 +36,27 @@ const (
 	qFIELDS
 )
 
-func (sc *SlurmCollector) collectQueu(session *ssh.SSHSession) error {
+func (sc *SlurmCollector) collectQueu() {
 	log.Debugln("Collecting Queue metrics...")
 	var collected uint
 	sc.runningJobs = nil
+
+	session, err := sc.openSession()
+	defer closeSession(session)
+
+	if err != nil {
+		log.Errorf("Error opening session for squeue: %s ", err.Error())
+		return
+	}
+
 	queueCommand := &ssh.SSHCommand{
 		Path: "squeue -h -a -X -O \"%12JobID,%20Name,%15User,%10Partition,State,NumCPUs,PendingTime,TimeUsed\" -P | grep 'PENDING' ",
 	}
-	err := session.RunCommand(queueCommand)
+	err = session.RunCommand(queueCommand)
 
 	if err != nil {
-		log.Errorf("squeue: %s", err.Error())
-		return err
+		log.Errorf("squeue command failed: %s", err.Error())
+		return
 	}
 
 	// wait for stdout to fill (it is being filled async by ssh)
@@ -83,7 +92,7 @@ func (sc *SlurmCollector) collectQueu(session *ssh.SSHSession) error {
 	}
 	collected++
 	log.Infof("%d queued jobs collected", collected)
-	return nil
+	return
 }
 
 func squeueLineParser(line string) []string {

@@ -17,7 +17,6 @@ package slurm
 
 import (
 	"errors"
-	"fmt"
 	"hpc_exporter/ssh"
 	"strconv"
 	"strings"
@@ -37,20 +36,26 @@ const (
 	iSTATESNUMBER = 4
 )
 
-func (sc *SlurmCollector) collectInfo(session *ssh.SSHSession) error {
+func (sc *SlurmCollector) collectInfo() {
 	log.Debugln("Collecting Info metrics...")
 	var collected uint
+	session, err := sc.openSession()
+	defer closeSession(session)
 
+	if err != nil {
+		log.Errorf("Error opening session for sinfo: %s ", err.Error())
+		return
+	}
 	// execute the command
 	infoCommand := &ssh.SSHCommand{
 		Path: "sinfo -h -o \"%20R %.5a %.20F\" | uniq",
 	}
 	log.Debugln(infoCommand)
-	err := session.RunCommand(infoCommand)
+	err = session.RunCommand(infoCommand)
 
 	if err != nil {
-		log.Errorf("sinfo: %s", err.Error())
-		return err
+		log.Errorf("sinfo command failed: %s", err.Error())
+		return
 	}
 
 	// wait for stdout to fill (it is being filled async by ssh)
@@ -67,16 +72,15 @@ func (sc *SlurmCollector) collectInfo(session *ssh.SSHSession) error {
 		availability, errb := PartitionStateDict[fields[iAVAIL]]
 
 		if !errb {
-			err := fmt.Errorf("Error when parsing partition availability: %s", fields[iAVAIL])
-			log.Warnf(err.Error())
-			return err
+			log.Warnf("Error parsing '%s' partition availability: %s", partition, fields[iAVAIL])
+			continue
 		}
 
 		idle, allocated, total, err := parseNodes(fields[iSTATES])
 
 		if err != nil {
 			log.Warnf(err.Error())
-			return err
+			return
 		}
 
 		sc.jobMetrics["PartAvai"][partition] = float64(availability)
@@ -88,7 +92,7 @@ func (sc *SlurmCollector) collectInfo(session *ssh.SSHSession) error {
 
 	}
 	log.Infof("%d partition info collected", collected)
-	return nil
+	return
 }
 
 func sinfoLineParser(line string) []string {
