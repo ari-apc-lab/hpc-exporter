@@ -5,9 +5,6 @@ import (
 	"errors"
 	"hpc_exporter/ssh"
 	"io"
-	"strconv"
-	"strings"
-	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -59,11 +56,8 @@ type PBSCollector struct {
 
 	sshConfig         *ssh.SSHConfig
 	sshClient         *ssh.SSHClient
-	timeZone          *time.Location
 	alreadyRegistered []string
 	//	lasttime          time.Time
-
-	jobsMap map[string](jobDetailsMap)
 }
 
 func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string) *PBSCollector {
@@ -187,29 +181,12 @@ func (sc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (sc *PBSCollector) executeSSHCommand(cmd string) (*ssh.SSHSession, error) {
-	command := &ssh.SSHCommand{
-		Path: cmd,
-		// Env:    []string{"LC_DIR=/usr"},
-	}
-
-	var outb, errb bytes.Buffer
-	session, err := sc.sshClient.OpenSession(nil, &outb, &errb)
-	if err == nil {
-		err = session.RunCommand(command)
-		return session, err
-	} else {
-		log.Errorf("Opening SSH session: %s", err.Error())
-		return nil, err
-	}
-}
-
 /*
 func (sc *PBSCollector) setLastTime() {
 	sc.lasttime = time.Now().In(sc.timeZone).Add(-1 * time.Minute)
 }
 */
-
+/*
 func parsePBSTime(field string) (uint64, error) {
 	var days, hours, minutes, seconds uint64
 	var err error
@@ -277,7 +254,7 @@ func parsePBSTime(field string) (uint64, error) {
 
 	return days*24*60*60 + hours*60*60 + minutes*60 + seconds, nil
 }
-
+*/
 // nextLineIterator returns a function that iterates
 // over an io.Reader object returning each line  parsed
 // in fields following the parser method passed as argument

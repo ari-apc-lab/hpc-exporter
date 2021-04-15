@@ -39,28 +39,14 @@ const (
 func (sc *SlurmCollector) collectInfo() {
 	log.Debugln("Collecting Info metrics...")
 	var collected uint
-	session, err := sc.openSession()
-	defer closeSession(session)
 
-	if err != nil {
-		log.Errorf("Error opening session for sinfo: %s ", err.Error())
-		return
-	}
 	// execute the command
-	infoCommand := &ssh.SSHCommand{
-		Path: "sinfo -h -o \"%20R %.5a %.20F\" | uniq",
-	}
-	log.Debugln(infoCommand)
-	err = session.RunCommand(infoCommand)
-
-	if err != nil {
-		err_chunk, err2 := session.ErrBuffer.ReadString('\n')
-		err_str := err_chunk
-		for ; err2 == nil; err_str += err_chunk {
-			err_chunk, err2 = session.ErrBuffer.ReadString('\n')
-		}
-		log.Errorf("sinfo command failed: %s", err.Error())
-		log.Debugf("Error was: %s", err_str)
+	infoCommand := "sinfo -h -o \"%20R %.5a %.20F\" | uniq"
+	log.Debugln("info command: %s", infoCommand)
+	session := ssh.ExecuteSSHCommand(infoCommand, sc.sshClient)
+	if session != nil {
+		defer session.CloseSession()
+	} else {
 		return
 	}
 
@@ -98,7 +84,6 @@ func (sc *SlurmCollector) collectInfo() {
 
 	}
 	log.Infof("%d partition info collected", collected)
-	return
 }
 
 func sinfoLineParser(line string) []string {
@@ -115,7 +100,7 @@ func sinfoLineParser(line string) []string {
 func parseNodes(ns string) (float64, float64, float64, error) {
 
 	nodesByStatus := strings.Split(ns, "/")
-	if len(nodesByStatus) != 4 {
+	if len(nodesByStatus) != iSTATESNUMBER {
 		return 0, 0, 0, errors.New("Could not parse nodes: " + ns)
 	}
 	alloc, _ := strconv.ParseFloat(nodesByStatus[0], 64)

@@ -42,29 +42,14 @@ const (
 func (sc *SlurmCollector) collectAcct() {
 	log.Debugln("Collecting Acct metrics...")
 	var collected uint
-	session, err := sc.openSession()
-	defer closeSession(session)
 
-	if err != nil {
-		log.Errorf("Error opening session for sacct: %s ", err.Error())
-		return
-	}
 	startTime := getstarttime(sc.sacctHistory)
-	sacctCommand := &ssh.SSHCommand{
-		Path: "sacct -n -X -o \"JobIDRaw,JobName%20,User%15,Partition%10,State%14,NCPUS%6,Submit%23,ElapsedRaw%7,MaxVMSize%10,MaxRSS%10\" -S " + startTime + " | grep -v 'PENDING' ",
-	}
+	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName%20,User%15,Partition%10,State%14,NCPUS%6,Submit%23,ElapsedRaw%7,MaxVMSize%10,MaxRSS%10\" -S " + startTime + " | grep -v 'PENDING' "
 
-	err = session.RunCommand(sacctCommand)
-	if err != nil {
-
-		err_chunk, err2 := session.ErrBuffer.ReadString('\n')
-		err_str := err_chunk
-		for ; err2 == nil; err_str += err_chunk {
-			err_chunk, err2 = session.ErrBuffer.ReadString('\n')
-		}
-
-		log.Errorf("sacct command failed: %s", err.Error())
-		log.Debugf("Error was: %s", err_str)
+	session := ssh.ExecuteSSHCommand(acctCommand, sc.sshClient)
+	if session != nil {
+		defer session.CloseSession()
+	} else {
 		return
 	}
 
@@ -101,7 +86,6 @@ func (sc *SlurmCollector) collectAcct() {
 	}
 	collected++
 	log.Infof("%d finished jobs collected", collected)
-	return
 }
 
 func sacctLineParser(line string) []string {
