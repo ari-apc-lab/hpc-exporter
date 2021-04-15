@@ -131,7 +131,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 				sc.descPtrMap["userJobState"],
 				prometheus.GaugeValue,
 				float64(state),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], 
 			)
 			
 			// Job exit status			
@@ -143,7 +143,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 				sc.descPtrMap["userJobExitStatus"],
 				prometheus.GaugeValue,
 				float64(exit_status),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], 
 			)
 			
 			// Job total runtime
@@ -155,8 +155,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 				sc.descPtrMap["userJobTotalRuntime"],
 				prometheus.GaugeValue,
 				float64(total_runtime),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
-				jobdetails["start_time"],jobdetails["comp_time"],
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], 
 			)
 				
 			// Job resources consumed wall time
@@ -172,8 +171,7 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 				sc.descPtrMap["userJobResourcesWallTime"],
 				prometheus.GaugeValue,
 				float64(walltime),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
-				jobdetails["start_time"],jobdetails["comp_time"],		
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], 	
 			)
 			
 			// Job resources consumed cpu time
@@ -189,40 +187,33 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 				sc.descPtrMap["userJobResourcesCpuTime"],
 				prometheus.GaugeValue,
 				float64(cputime),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
-				jobdetails["start_time"],jobdetails["comp_time"],		
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME],	
 			)
 			
 			// Job resources consumed pyhsical memory		
 			physmem := -1.0
-			physmem_units := ""
 			if jobdetails["resources_used.mem"] != "" {
 				split_physmem := strings.Split(jobdetails["resources_used.mem"],"k")
 				physmem, _ = strconv.ParseFloat(split_physmem[0], 64)
-				physmem_units = "kb"
 			}
 			ch <- prometheus.MustNewConstMetric(
 				sc.descPtrMap["userJobResourcesPhysMem"],
 				prometheus.GaugeValue,
 				float64(physmem),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
-				physmem_units,		
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME],		
 			)	
 			
 			// Job resources consumed virtual memory
 			virtmem := -1.0
-			virtmem_units := ""
 			if jobdetails["resources_used.vmem"] != "" {
 				split_virtmem := strings.Split(jobdetails["resources_used.vmem"],"k")
 				virtmem, _ = strconv.ParseFloat(split_virtmem[0], 64)
-				virtmem_units = "kb"
 			}
 			ch <- prometheus.MustNewConstMetric(
 				sc.descPtrMap["userJobResourcesVirtMem"],
 				prometheus.GaugeValue,
 				float64(virtmem),
-				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], fields[aS], jobdetails["exit_status"],
-				virtmem_units,		
+				fields[aJOBID], fields[aUSERNAME], fields[aJOBNAME], 
 			)		
 			
 			sc.alreadyRegistered = append(sc.alreadyRegistered, fields[aJOBID])

@@ -88,7 +88,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		"pbs_qstat_u_jobstate",
 		"user job current state",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
+			"job_id", "username", "job_name", 
 		},
 		nil,
 	)
@@ -97,7 +97,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		"pbs_qstat_u_exitstatus",
 		"user job exit status",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
+			"job_id", "username", "job_name", 
 		},
 		nil,
 	)
@@ -106,8 +106,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		"pbs_qstat_u_totalruntime",
 		"user job total runtime in seconds",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-			"start_time", "comp_time",
+			"job_id", "username", "job_name", 
 		},
 		nil,
 	)
@@ -116,8 +115,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		"pbs_qstat_u_consumedwalltime",
 		"user job consumed walltime in seconds",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-			"start_time", "comp_time",
+			"job_id", "username", "job_name", 
 		},
 		nil,
 	)
@@ -126,8 +124,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		"pbs_qstat_u_consumedcputime",
 		"user job consumed cputime in seconds",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-			"start_time", "comp_time",
+			"job_id", "username", "job_name", 
 		},
 		nil,
 	)
@@ -136,7 +133,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		"pbs_qstat_u_consumedpmem",
 		"user job consumed pyhsical memory",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status", "units",
+			"job_id", "username", "job_name", 
 		},
 		nil,
 	)
@@ -145,7 +142,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		"pbs_qstat_u_consumedvmem",
 		"user job consumed virtual memory",
 		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status", "units",
+			"job_id", "username", "job_name",
 		},
 		nil,
 	)		
