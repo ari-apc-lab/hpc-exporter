@@ -175,6 +175,18 @@ func (client *SSHClient) OpenSession(inBuffer, outBuffer, errBuffer *bytes.Buffe
 	return ses, nil
 }
 
+func (s *SSHSession) CloseSession() {
+
+	log.Debugf("Closing session")
+
+	err := s.Close()
+	if err == nil {
+		log.Debugf("Session closed successfully")
+	} else {
+		log.Errorf("Session could not be closed properly: %s", err.Error())
+	}
+}
+
 func (session *SSHSession) setupSessionBuffers() error {
 	if session.InBuffer != nil {
 		stdin, err := session.StdinPipe()
@@ -201,6 +213,34 @@ func (session *SSHSession) setupSessionBuffers() error {
 	}
 
 	return nil
+}
+
+func ExecuteSSHCommand(cmd string, client *SSHClient) *SSHSession {
+	command := &SSHCommand{
+		Path: cmd,
+		// Env:    []string{"LC_DIR=/usr"},
+	}
+
+	var outb, errb bytes.Buffer
+	session, err := client.OpenSession(nil, &outb, &errb)
+	if err == nil {
+		if err2 := session.RunCommand(command); err2 == nil {
+			return session
+		} else {
+			err_chunk, err3 := session.ErrBuffer.ReadString('\n')
+			errSsh := err_chunk
+			for ; err3 == nil; errSsh += err_chunk {
+				err_chunk, err3 = session.ErrBuffer.ReadString('\n')
+			}
+			log.Errorf("Error when executing SSH Command: " + cmd)
+			log.Debugf("Error was: " + errSsh)
+			return nil
+		}
+	} else {
+		log.Errorf("Error when executing SSH Command: " + cmd)
+		log.Debugf("Error opening session")
+		return nil
+	}
 }
 
 func (session *SSHSession) RunCommand(cmd *SSHCommand) error {

@@ -41,28 +41,11 @@ func (sc *SlurmCollector) collectQueu() {
 	var collected uint
 	sc.runningJobs = nil
 
-	session, err := sc.openSession()
-	defer closeSession(session)
-
-	if err != nil {
-
-		log.Errorf("Error opening session for squeue: %s ", err.Error())
-		return
-	}
-
-	queueCommand := &ssh.SSHCommand{
-		Path: "squeue -h -a -X -O \"%12JobID,%20Name,%15User,%10Partition,State,NumCPUs,PendingTime,TimeUsed\" -P | grep 'PENDING' ",
-	}
-	err = session.RunCommand(queueCommand)
-
-	if err != nil {
-		err_chunk, err2 := session.ErrBuffer.ReadString('\n')
-		err_str := err_chunk
-		for ; err2 == nil; err_str += err_chunk {
-			err_chunk, err2 = session.ErrBuffer.ReadString('\n')
-		}
-		log.Errorf("squeue command failed: %s", err.Error())
-		log.Debugf("Error was: %s", err_str)
+	queueCommand := "squeue -h -a -X -O \"%12JobID,%20Name,%15User,%10Partition,State,NumCPUs,PendingTime,TimeUsed\" -P | grep 'PENDING' "
+	session := ssh.ExecuteSSHCommand(queueCommand, sc.sshClient)
+	if session != nil {
+		defer session.CloseSession()
+	} else {
 		return
 	}
 
@@ -99,7 +82,6 @@ func (sc *SlurmCollector) collectQueu() {
 	}
 	collected++
 	log.Infof("%d queued jobs collected", collected)
-	return
 }
 
 func squeueLineParser(line string) []string {

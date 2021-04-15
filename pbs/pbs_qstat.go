@@ -1,6 +1,7 @@
 package pbs
 
 import (
+	"hpc_exporter/ssh"
 	"io"
 	"strconv"
 	"strings"
@@ -35,12 +36,10 @@ func (sc *PBSCollector) collectJobQstat(jobid string) jobDetailsMap {
 	currentCommand := "qstat -f " + jobid + " -1"
 	log.Debugln(currentCommand)
 
-	sshSession, err := sc.executeSSHCommand(currentCommand)
+	sshSession := ssh.ExecuteSSHCommand(currentCommand, sc.sshClient)
 	if sshSession != nil {
 		defer sshSession.Close()
-	}
-	if err != nil {
-		log.Errorf("qstat: %s ", err.Error())
+	} else {
 		return nil
 	}
 
@@ -78,12 +77,10 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 	currentCommand := "qstat -a"
 	log.Debugln(currentCommand)
 
-	sshSession, err := sc.executeSSHCommand(currentCommand)
+	sshSession := ssh.ExecuteSSHCommand(currentCommand, sc.sshClient)
 	if sshSession != nil {
 		defer sshSession.Close()
-	}
-	if err != nil {
-		log.Errorf("qstat: %s ", err.Error())
+	} else {
 		return
 	}
 
@@ -93,19 +90,13 @@ func (sc *PBSCollector) collectQstat(ch chan<- prometheus.Metric) {
 
 	var buffer = sshSession.OutBuffer
 
-	line, error := buffer.ReadString('\n') // new line
-	line, error = buffer.ReadString('\n')  // frontend header line
-	line, error = buffer.ReadString('\n')  // new line
-	line, error = buffer.ReadString('\n')  // fields header line
-	line, error = buffer.ReadString('\n')  // dashes: "------..."
-	if error == nil {
-		log.Debugf("qstat: Last header line read: %s", line)
-	} else {
-		if error == io.EOF {
+	for i := 0; i < 5; i++ {
+		_, err := buffer.ReadString('\n')
+		if err == io.EOF {
 			log.Info("qstat: No user jobs in the infrastructure")
 			return
-		} else {
-			log.Fatalf("qstat: Something went wrong when parsing the output: %s", error)
+		} else if err != nil {
+			log.Fatalf("qstat: Something went wrong when parsing the output: %s", err.Error())
 		}
 	}
 

@@ -113,8 +113,6 @@ var LongStatusDict = map[string]int{
 
 type CollectFunc func(ch chan<- prometheus.Metric)
 
-type jobDetailsMap map[string](string)
-
 type trackedList []string
 
 type SlurmCollector struct {
@@ -124,7 +122,6 @@ type SlurmCollector struct {
 	sshClient      *ssh.SSHClient
 	runningJobs    trackedList
 	trackedJobs    map[string]bool
-	jobsMap        map[string](jobDetailsMap)
 	scrapeInterval int
 	lastScrape     time.Time
 	jobMetrics     map[string](map[string](float64))
@@ -261,8 +258,8 @@ func (sc *SlurmCollector) Describe(ch chan<- *prometheus.Desc) {
 func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 	var err error
 
-	log.Debugf("Time since last scrape: %s seconds", time.Now().Sub(sc.lastScrape).Seconds())
-	if time.Now().Sub(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
+	log.Debugf("Time since last scrape: %s seconds", time.Since(sc.lastScrape).Seconds())
+	if time.Since(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
 		sc.sshClient, err = sc.sshConfig.NewClient()
 		if err != nil {
 			log.Errorf("Creating SSH client: %s", err.Error())
@@ -282,18 +279,6 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 
 	sc.updateMetrics(ch)
 
-}
-
-func (sc *SlurmCollector) openSession() (*ssh.SSHSession, error) {
-
-	var outb, errb bytes.Buffer
-	session, err := sc.sshClient.OpenSession(nil, &outb, &errb)
-	if err == nil {
-		return session, err
-	} else {
-		log.Errorf("Opening SSH session: %s", err.Error())
-		return nil, err
-	}
 }
 
 // nextLineIterator returns a function that iterates
@@ -419,16 +404,4 @@ func (sc *SlurmCollector) delJobs() {
 		}
 	}
 	log.Debugf("%d old jobs deleted", i)
-}
-
-func closeSession(s *ssh.SSHSession) {
-
-	log.Debugf("Closing session")
-
-	err := s.Close()
-	if err == nil {
-		log.Debugf("Session closed successfully")
-	} else {
-		log.Errorf("Session could not be closed properly: %s", err.Error())
-	}
 }
