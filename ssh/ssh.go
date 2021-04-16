@@ -232,12 +232,17 @@ func ExecuteSSHCommand(cmd string, client *SSHClient) *SSHSession {
 			for ; err3 == nil; errSsh += err_chunk {
 				err_chunk, err3 = session.ErrBuffer.ReadString('\n')
 			}
-			log.Errorf("Error when executing SSH Command: " + cmd)
+			err_chunk, err3 = session.OutBuffer.ReadString('\n')
+			errSsh += err_chunk
+			for ; err3 == nil; errSsh += err_chunk {
+				err_chunk, err3 = session.OutBuffer.ReadString('\n')
+			}
+			log.Errorf("Error: %s when executing SSH Command: %s", err2.Error(), cmd)
 			log.Debugf("Error was: " + errSsh)
 			return nil
 		}
 	} else {
-		log.Errorf("Error when executing SSH Command: " + cmd)
+		log.Errorf("Error: %s when executing SSH Command: %s", err, cmd)
 		log.Debugf("Error opening session")
 		return nil
 	}

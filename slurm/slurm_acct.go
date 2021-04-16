@@ -16,7 +16,6 @@
 package slurm
 
 import (
-	"fmt"
 	"hpc_exporter/ssh"
 	"strconv"
 	"strings"
@@ -32,7 +31,7 @@ const (
 	accPARTITION
 	accSTATE
 	accNCPUS
-	accSUBMIT
+	accRESERVED
 	accELAPSED
 	accVMEM
 	accRSS
@@ -44,7 +43,7 @@ func (sc *SlurmCollector) collectAcct() {
 	var collected uint
 
 	startTime := getstarttime(sc.sacctHistory)
-	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName%20,User%15,Partition%10,State%14,NCPUS%6,Submit%23,ElapsedRaw%7,MaxVMSize%10,MaxRSS%10\" -S " + startTime + " | grep -v 'PENDING' "
+	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,Reserved,ElapsedRaw,MaxVMSize,MaxRSS\" -p -S " + startTime
 
 	session := ssh.ExecuteSSHCommand(acctCommand, sc.sshClient)
 	if session != nil {
@@ -75,21 +74,20 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.labels["JobUser"][jobid] = fields[accUSERNAME]
 		sc.labels["JobPart"][jobid] = fields[accPARTITION]
 
-		submit, _ := time.Parse("RFC3339", fields[accSUBMIT]+"Z")
-
 		sc.jobMetrics["JobState"][jobid] = float64(LongStatusDict[state])
 		sc.jobMetrics["JobWalltime"][jobid], _ = strconv.ParseFloat(fields[accELAPSED], 64)
 		sc.jobMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
-		sc.jobMetrics["JobQueued"][jobid] = float64(time.Now().Unix()) - float64(submit.Unix()) - sc.jobMetrics["JobWalltime"][jobid]
+		sc.jobMetrics["JobQueued"][jobid] = computeSlurmTime(fields[accRESERVED])
 		sc.jobMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
 		sc.jobMetrics["JobRSS"][jobid] = parseMem(fields[accRSS])
+		collected++
 	}
-	collected++
+
 	log.Infof("%d finished jobs collected", collected)
 }
 
 func sacctLineParser(line string) []string {
-	fields := strings.Fields(line)
+	fields := strings.Split(line, "|")
 
 	if len(fields) < accFIELDS {
 		log.Warnf("sacct line parse failed (%s): %d fields expected, %d parsed", line, accFIELDS, len(fields))
@@ -97,19 +95,4 @@ func sacctLineParser(line string) []string {
 	}
 
 	return fields
-}
-
-func getstarttime(days int) string {
-
-	start := time.Now().AddDate(0, 0, days)
-	hour := start.Hour()
-	minute := start.Minute()
-	second := start.Second()
-	day := start.Day()
-	month := start.Month()
-	year := start.Year()
-
-	str := fmt.Sprintf("%4d-%2d-%2dT%2d:%2d:%2d", year, month, day, hour, minute, second)
-
-	return str
 }

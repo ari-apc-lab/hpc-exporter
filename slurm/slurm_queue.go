@@ -27,7 +27,7 @@ import (
 const (
 	qJOBID = iota
 	qNAME
-	qUSER
+	qUSERNAME
 	qPARTITION
 	qSTATE
 	qNCPUS
@@ -41,7 +41,7 @@ func (sc *SlurmCollector) collectQueu() {
 	var collected uint
 	sc.runningJobs = nil
 
-	queueCommand := "squeue -h -a -X -O \"%12JobID,%20Name,%15User,%10Partition,State,NumCPUs,PendingTime,TimeUsed\" -P | grep 'PENDING' "
+	queueCommand := "squeue -h -a -O \"JobID:12,Name:20,UserName:15,Partition:15,State:13,NumCPUs:7,SubmitTime:20,TimeUsed:.13\" -P "
 	session := ssh.ExecuteSSHCommand(queueCommand, sc.sshClient)
 	if session != nil {
 		defer session.CloseSession()
@@ -67,27 +67,28 @@ func (sc *SlurmCollector) collectQueu() {
 		} else {
 			sc.trackedJobs[jobid] = true
 			sc.labels["JobName"][jobid] = fields[qNAME]
-			sc.labels["JobUser"][jobid] = fields[qUSER]
+			sc.labels["JobUser"][jobid] = fields[qUSERNAME]
 			sc.labels["JobPart"][jobid] = fields[qPARTITION]
 
+			submit, _ := time.Parse(time.RFC3339, fields[qPENDING]+"Z")
 			sc.jobMetrics["JobState"][jobid] = float64(LongStatusDict[state])
 			sc.jobMetrics["JobWalltime"][jobid] = computeSlurmTime(fields[qWALLTIME])
 			sc.jobMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[qNCPUS], 64)
-			sc.jobMetrics["JobQueued"][jobid], _ = strconv.ParseFloat(fields[accSUBMIT], 64)
+			sc.jobMetrics["JobQueued"][jobid] = float64(time.Since(submit)) / 9
 			sc.jobMetrics["JobVMEM"][jobid] = 0
 			sc.jobMetrics["JobRSS"][jobid] = 0
 
 		}
-
+		collected++
 	}
-	collected++
+
 	log.Infof("%d queued jobs collected", collected)
 }
 
 func squeueLineParser(line string) []string {
 	fields := strings.Fields(line)
 
-	if len(fields) < accFIELDS {
+	if len(fields) < qFIELDS {
 		log.Warnf("squeue line parse failed (%s): %d fields expected, %d parsed", line, qFIELDS, len(fields))
 		return nil
 	}

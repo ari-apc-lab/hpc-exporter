@@ -3,6 +3,7 @@ package slurm
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"strings"
@@ -165,7 +166,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 	}
 
 	jobtags := []string{
-		"job_id", "username", "job_name", "partition",
+		"job_id", "job_name", "job_user", "partition",
 	}
 
 	partitiontags := []string{
@@ -258,27 +259,42 @@ func (sc *SlurmCollector) Describe(ch chan<- *prometheus.Desc) {
 func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 	var err error
 
-	log.Debugf("Time since last scrape: %s seconds", time.Since(sc.lastScrape).Seconds())
+	log.Debugf("Time since last scrape: %f seconds", time.Since(sc.lastScrape).Seconds())
 	if time.Since(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
 		sc.sshClient, err = sc.sshConfig.NewClient()
 		if err != nil {
 			log.Errorf("Creating SSH client: %s", err.Error())
 			return
 		}
-
+		defer sc.sshClient.Close()
 		log.Infof("Collecting metrics from Slurm...")
 		sc.trackedJobs = make(map[string]bool)
 		sc.collectQueu()
 		sc.collectAcct()
 		sc.collectInfo()
 		sc.lastScrape = time.Now()
+		err = sc.sshClient.Close()
 
 		sc.delJobs()
 
 	}
 
 	sc.updateMetrics(ch)
+}
 
+func getstarttime(days int) string {
+
+	start := time.Now().AddDate(0, 0, -days)
+	hour := start.Hour()
+	minute := start.Minute()
+	second := start.Second()
+	day := start.Day()
+	month := start.Month()
+	year := start.Year()
+
+	str := fmt.Sprintf("%4d-%02d-%02dT%02d:%02d:%02d", year, month, day, hour, minute, second)
+
+	return str
 }
 
 // nextLineIterator returns a function that iterates
@@ -346,6 +362,9 @@ func notContains(slice trackedList, s string) bool {
 }
 
 func parseMem(s string) float64 {
+	if len(s) == 0 {
+		return -1
+	}
 	if f, e := strconv.ParseFloat(s, 64); e == nil {
 		return f * 10e-6
 	}
