@@ -182,6 +182,8 @@ func (s *SSHSession) CloseSession() {
 	err := s.Close()
 	if err == nil {
 		log.Debugf("Session closed successfully")
+	} else if err == io.EOF {
+		log.Debugf("Session had already been closed: %s", err.Error())
 	} else {
 		log.Errorf("Session could not be closed properly: %s", err.Error())
 	}

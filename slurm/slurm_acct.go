@@ -63,8 +63,7 @@ func (sc *SlurmCollector) collectAcct() {
 			continue
 		}
 		jobid := fields[accJOBID]
-		state := fields[accSTATE]
-
+		state := strings.Fields(fields[accSTATE])[0]
 		if (state == "RUNNING" || state == "COMPLETING") && notContains(sc.runningJobs, jobid) {
 			continue
 		}
