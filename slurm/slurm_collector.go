@@ -7,6 +7,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"hpc_exporter/ssh"
@@ -128,6 +129,7 @@ type SlurmCollector struct {
 	jobMetrics     map[string](map[string](float64))
 	parMetrics     map[string](map[string](float64))
 	labels         map[string](map[string](string))
+	mutex          *sync.Mutex
 }
 
 func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int) *SlurmCollector {
@@ -142,6 +144,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 		jobMetrics:     make(map[string](map[string](float64))),
 		parMetrics:     make(map[string](map[string](float64))),
 		labels:         make(map[string](map[string](string))),
+		mutex:          &sync.Mutex{},
 	}
 	newerSlurmCollector.jobMetrics["JobState"] = make(map[string]float64)
 	newerSlurmCollector.jobMetrics["JobWalltime"] = make(map[string]float64)
@@ -257,10 +260,13 @@ func (sc *SlurmCollector) Describe(ch chan<- *prometheus.Desc) {
 // passes them to the ch channel.
 // It implements collector interface
 func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
+	sc.mutex.Lock()
+	defer sc.mutex.Unlock()
 	var err error
 
 	log.Debugf("Time since last scrape: %f seconds", time.Since(sc.lastScrape).Seconds())
 	if time.Since(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
+
 		sc.sshClient, err = sc.sshConfig.NewClient()
 		if err != nil {
 			log.Errorf("Creating SSH client: %s", err.Error())
@@ -274,7 +280,6 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		sc.collectInfo()
 		sc.lastScrape = time.Now()
 		err = sc.sshClient.Close()
-
 		sc.delJobs()
 
 	}
