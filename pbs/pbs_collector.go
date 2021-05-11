@@ -5,6 +5,10 @@ import (
 	"errors"
 	"hpc_exporter/ssh"
 	"io"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -14,11 +18,11 @@ import (
 const (
 	pCOMPLETED = iota
 	pEXITING
-	pHELD
-	pQUEUED
 	pRUNNING
-	pMOVING
+	pQUEUED
 	pWAITING
+	pHELD
+	pMOVING
 	pSUSPENDED
 )
 
@@ -47,25 +51,55 @@ var StatusDict = map[string]int{
 	"S": pSUSPENDED,
 }
 
-type CollectFunc func(ch chan<- prometheus.Metric)
-
-type jobDetailsMap map[string](string)
-
 type PBSCollector struct {
-	descPtrMap map[string](*prometheus.Desc)
-
-	sshConfig         *ssh.SSHConfig
-	sshClient         *ssh.SSHClient
-	alreadyRegistered []string
-	//	lasttime          time.Time
+	descPtrMap     map[string](*prometheus.Desc)
+	trackedJobs    map[string]bool
+	sshConfig      *ssh.SSHConfig
+	sshClient      *ssh.SSHClient
+	scrapeInterval int
+	lastScrape     time.Time
+	jobMetrics     map[string](map[string](float64))
+	qMetrics       map[string](map[string](float64))
+	labels         map[string](map[string](string))
+	mutex          *sync.Mutex
 }
 
-func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, scrapeInterval int) *PBSCollector {
 	newerPBSCollector := &PBSCollector{
-		descPtrMap:        make(map[string](*prometheus.Desc)),
-		sshClient:         nil,
-		alreadyRegistered: make([]string, 0),
+		descPtrMap:     make(map[string](*prometheus.Desc)),
+		sshClient:      nil,
+		trackedJobs:    make(map[string]bool),
+		scrapeInterval: scrapeInterval,
+		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * scrapeInterval)))),
+		jobMetrics:     make(map[string](map[string](float64))),
+		qMetrics:       make(map[string](map[string](float64))),
+		labels:         make(map[string](map[string](string))),
+		mutex:          &sync.Mutex{},
 	}
+	newerPBSCollector.jobMetrics["JobState"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobWalltimeUsed"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobWalltimeMax"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobWalltimeRem"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobCPUTime"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobNCPUs"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobVMEM"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobQueued"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobRSS"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobExitStatus"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueTotal"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueEnabled"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueStarted"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueQueued"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueRunning"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueHeld"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueWaiting"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueTransit"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueExiting"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueComplete"] = make(map[string]float64)
+	newerPBSCollector.labels["JobName"] = make(map[string]string)
+	newerPBSCollector.labels["JobUser"] = make(map[string]string)
+	newerPBSCollector.labels["JobQueue"] = make(map[string]string)
+	newerPBSCollector.labels["QueueType"] = make(map[string]string)
 
 	switch authmethod := sshAuthMethod; authmethod {
 	case "keypair":
@@ -76,88 +110,161 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
-	newerPBSCollector.descPtrMap["userJobState"] = prometheus.NewDesc(
-		"pbs_qstat_u_jobstate",
-		"user job current state",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-		},
+	jobtags := []string{
+		"job_id", "job_name", "job_user", "job_queue",
+	}
+
+	queuetags := []string{
+		"queue_name", "queue_type",
+	}
+
+	newerPBSCollector.descPtrMap["JobState"] = prometheus.NewDesc(
+		"pbs_job_state",
+		"job current state",
+		jobtags,
 		nil,
 	)
 
-	newerPBSCollector.descPtrMap["userJobExitStatus"] = prometheus.NewDesc(
-		"pbs_qstat_u_exitstatus",
-		"user job exit status",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-		},
+	newerPBSCollector.descPtrMap["JobWalltimeUsed"] = prometheus.NewDesc(
+		"pbs_job_walltime_used",
+		"job walltime used, time the job has been running (sec)",
+		jobtags,
 		nil,
 	)
 
-	newerPBSCollector.descPtrMap["userJobTotalRuntime"] = prometheus.NewDesc(
-		"pbs_qstat_u_totalruntime",
-		"user job total runtime in seconds",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-			"start_time", "comp_time",
-		},
+	newerPBSCollector.descPtrMap["JobWalltimeMax"] = prometheus.NewDesc(
+		"pbs_job_walltime_max",
+		"job maximum walltime allowed (sec)",
+		jobtags,
 		nil,
 	)
 
-	newerPBSCollector.descPtrMap["userJobResourcesWallTime"] = prometheus.NewDesc(
-		"pbs_qstat_u_consumedwalltime",
-		"user job consumed walltime in seconds",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-			"start_time", "comp_time",
-		},
+	newerPBSCollector.descPtrMap["JobWalltimeRem"] = prometheus.NewDesc(
+		"pbs_job_walltime_remaining",
+		"job walltime remaining (sec)",
+		jobtags,
 		nil,
 	)
 
-	newerPBSCollector.descPtrMap["userJobResourcesCpuTime"] = prometheus.NewDesc(
-		"pbs_qstat_u_consumedcputime",
-		"user job consumed cputime in seconds",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status",
-			"start_time", "comp_time",
-		},
+	newerPBSCollector.descPtrMap["JobCPUTime"] = prometheus.NewDesc(
+		"pbs_job_cpu_time",
+		"job cpu time expended (sec)",
+		jobtags,
 		nil,
 	)
 
-	newerPBSCollector.descPtrMap["userJobResourcesPhysMem"] = prometheus.NewDesc(
-		"pbs_qstat_u_consumedpmem",
-		"user job consumed pyhsical memory",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status", "units",
-		},
+	newerPBSCollector.descPtrMap["JobNCPUs"] = prometheus.NewDesc(
+		"pbs_job_cpu_n",
+		"job number of threads requested by the job",
+		jobtags,
 		nil,
 	)
 
-	newerPBSCollector.descPtrMap["userJobResourcesVirtMem"] = prometheus.NewDesc(
-		"pbs_qstat_u_consumedvmem",
-		"user job consumed virtual memory",
-		[]string{
-			"job_id", "username", "job_name", "job_state", "exit_status", "units",
-		},
+	newerPBSCollector.descPtrMap["JobVMEM"] = prometheus.NewDesc(
+		"pbs_job_mem_virtual",
+		"job virtual memory used",
+		jobtags,
 		nil,
 	)
 
-	/*
-		var err error
-		newerPBSCollector.timeZone, err = time.LoadLocation(timeZone)
-		if err != nil {
-			log.Fatalln(err.Error())
-		}
-		newerPBSCollector.setLastTime()
-	*/
+	newerPBSCollector.descPtrMap["JobQueued"] = prometheus.NewDesc(
+		"pbs_job_time_queued",
+		"job time spent between creation and running start (or now)",
+		jobtags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["JobRSS"] = prometheus.NewDesc(
+		"pbs_job_memory_physical",
+		"job physical memory used",
+		jobtags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["JobExitStatus"] = prometheus.NewDesc(
+		"pbs_job_exit_status",
+		"job exit status. -1 if not completed",
+		jobtags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueTotal"] = prometheus.NewDesc(
+		"pbs_queue_jobs_total",
+		"queue total number of jobs assigned",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueEnabled"] = prometheus.NewDesc(
+		"pbs_queue_enabled",
+		"queue if enabled 1, disabled 0",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueStarted"] = prometheus.NewDesc(
+		"pbs_queue_started",
+		"queue if started 1, stopped 0",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueQueued"] = prometheus.NewDesc(
+		"pbs_queue_jobs_queued",
+		"number of jobs in a queued state in this queue",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueRunning"] = prometheus.NewDesc(
+		"pbs_queue_jobs_running",
+		"number of jobs in a running state in this queue",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueHeld"] = prometheus.NewDesc(
+		"pbs_queue_jobs_held",
+		"number of jobs in a held state in this queue",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueWaiting"] = prometheus.NewDesc(
+		"pbs_queue_jobs_waiting",
+		"number of jobs in a waiting state in this queue",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueTransit"] = prometheus.NewDesc(
+		"pbs_queue_jobs_transit",
+		"number of jobs in a transit state in this queue",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueExiting"] = prometheus.NewDesc(
+		"pbs_queue_jobs_exiting",
+		"number of jobs in a exiting state in this queue",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueComplete"] = prometheus.NewDesc(
+		"pbs_queue_jobs_complete",
+		"number of jobs in a complete state in this queue",
+		queuetags,
+		nil,
+	)
 
 	return newerPBSCollector
 }
 
 // Describe sends metrics descriptions of this collector through the ch channel.
 // It implements collector interface
-func (sc *PBSCollector) Describe(ch chan<- *prometheus.Desc) {
-	for _, element := range sc.descPtrMap {
+func (pc *PBSCollector) Describe(ch chan<- *prometheus.Desc) {
+	for _, element := range pc.descPtrMap {
 		ch <- element
 	}
 }
@@ -165,29 +272,30 @@ func (sc *PBSCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect read the values of the metrics and
 // passes them to the ch channel.
 // It implements collector interface
-func (sc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
-	var err error
-	sc.sshClient, err = sc.sshConfig.NewClient()
-	if err != nil {
-		log.Errorf("Creating SSH client: %s", err.Error())
-		return
-	}
+func (pc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
+	pc.mutex.Lock()
+	defer pc.mutex.Unlock()
 
-	sc.collectQstat(ch)
-
-	err = sc.sshClient.Close()
-	if err != nil {
-		log.Errorf("Closing SSH client: %s", err.Error())
+	log.Debugf("Time since last scrape: %f seconds", time.Since(pc.lastScrape).Seconds())
+	if time.Since(pc.lastScrape).Seconds() > float64(pc.scrapeInterval) {
+		var err error
+		pc.sshClient, err = pc.sshConfig.NewClient()
+		if err != nil {
+			log.Errorf("Creating SSH client: %s", err.Error())
+			return
+		}
+		defer pc.sshClient.Close()
+		log.Infof("Collecting metrics from PBS...")
+		pc.trackedJobs = make(map[string]bool)
+		pc.collectJobs(ch)
+		pc.collectQueues(ch)
+		pc.lastScrape = time.Now()
+		pc.delJobs()
 	}
+	pc.updateMetrics(ch)
 }
 
-/*
-func (sc *PBSCollector) setLastTime() {
-	sc.lasttime = time.Now().In(sc.timeZone).Add(-1 * time.Minute)
-}
-*/
-/*
-func parsePBSTime(field string) (uint64, error) {
+func parsePBSTime(field string) (float64, error) {
 	var days, hours, minutes, seconds uint64
 	var err error
 
@@ -252,28 +360,116 @@ func parsePBSTime(field string) (uint64, error) {
 		return 0, err
 	}
 
-	return days*24*60*60 + hours*60*60 + minutes*60 + seconds, nil
+	return float64(days*24*60*60 + hours*60*60 + minutes*60 + seconds), nil
 }
-*/
+
 // nextLineIterator returns a function that iterates
 // over an io.Reader object returning each line  parsed
 // in fields following the parser method passed as argument
-func nextLineIterator(buf io.Reader, parser func(string) []string) func() ([]string, error) {
-	var buffer = buf.(*bytes.Buffer)
-	var parse = parser
-	return func() ([]string, error) {
-		// get next line in buffer
-		line, err := buffer.ReadString('\n')
-		if err != nil {
-			return nil, err
-		}
-		// fmt.Print(line)
 
-		// parse the line and return
-		parsed := parse(line)
-		if parsed == nil {
-			return nil, errors.New("not able to parse line")
+func parseBlocks(buf io.Reader) (map[string](map[string](string)), error) {
+	buffer := buf.(*bytes.Buffer)
+	result := make(map[string](map[string](string)))
+	var err error
+	var line string
+	var split_line []string
+	var label string
+	for {
+		line, err = buffer.ReadString('\n')
+		if err == io.EOF {
+			return result, nil
+		} else if err != nil {
+			return result, err
 		}
-		return parsed, nil
+		split_line = strings.Split(line, ":")
+		label = strings.TrimSpace(split_line[1])
+		result[label] = make(map[string](string))
+		for {
+			line, err = buffer.ReadString('\n')
+			if err == io.EOF {
+				return result, nil
+			} else if err != nil {
+				return result, err
+			} else if len(line) == 0 {
+				break
+			}
+			split_line = strings.Split(line, "=")
+			result[label][strings.TrimSpace(split_line[0])] = strings.TrimSpace(split_line[1])
+		}
 	}
+}
+
+func (pc *PBSCollector) updateMetrics(ch chan<- prometheus.Metric) {
+
+	log.Infof("Refreshing exposed metrics")
+
+	for metric, elem := range pc.jobMetrics {
+
+		for jobid, value := range elem {
+			ch <- prometheus.MustNewConstMetric(
+				pc.descPtrMap[metric],
+				prometheus.GaugeValue,
+				value,
+				jobid, pc.labels["JobName"][jobid], pc.labels["JobUser"][jobid], pc.labels["JobQueue"][jobid],
+			)
+		}
+	}
+
+	for metric, elem := range pc.qMetrics {
+
+		for queue, value := range elem {
+			ch <- prometheus.MustNewConstMetric(
+				pc.descPtrMap[metric],
+				prometheus.GaugeValue,
+				value,
+				queue, pc.labels["QueueType"][queue],
+			)
+		}
+	}
+}
+
+func (sc *PBSCollector) delJobs() {
+	log.Debugf("Cleaning old jobs")
+	i := 0
+	for job, tracked := range sc.trackedJobs {
+		if !tracked {
+			for _, elems := range sc.jobMetrics {
+				delete(elems, job)
+				i++
+			}
+		}
+	}
+	log.Debugf("%d old jobs deleted", i)
+}
+
+func parseMem(s string) (float64, error) {
+	l := len(s)
+	if l == 0 {
+		return -1, nil
+	} else if f, e := strconv.ParseFloat(s, 64); e == nil {
+		return f, nil
+	} else if l <= 2 {
+		return 0, errors.New("Could not parse memory")
+	}
+	num, err := strconv.ParseFloat(s[:l-2], 64)
+	if err != nil {
+
+		return 0, errors.New("Could not parse memory: " + err.Error())
+	}
+	switch c := s[l-2:]; c {
+	case "kb":
+		num = num * 1e3
+	case "mb":
+		num = num * 1e6
+	case "gb":
+		num = num * 1e9
+	default:
+		return 0, errors.New("Could not parse memory")
+	}
+	return num, nil
+}
+
+func parsePBSDateTime(s string) (time.Time, error) {
+	format := "Mon Jan 2 15:04:05 2006"
+	return time.Parse(format, s)
 }

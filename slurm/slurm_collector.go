@@ -45,17 +45,17 @@ const (
 )
 
 const (
-	pUP = iota
-	pDOWN
-	pDRAIN
-	pINACT
+	sUP = iota
+	sDOWN
+	sDRAIN
+	sINACT
 )
 
 var PartitionStateDict = map[string]int{
-	"up":    pUP,
-	"down":  pDOWN,
-	"drain": pDRAIN,
-	"inact": pINACT,
+	"up":    sUP,
+	"down":  sDOWN,
+	"drain": sDRAIN,
+	"inact": sINACT,
 }
 
 // StatusDict maps string status with its int values
@@ -169,7 +169,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshK
 	}
 
 	jobtags := []string{
-		"job_id", "job_name", "job_user", "partition",
+		"job_id", "job_name", "job_user", "job_partition",
 	}
 
 	partitiontags := []string{
@@ -262,11 +262,10 @@ func (sc *SlurmCollector) Describe(ch chan<- *prometheus.Desc) {
 func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 	sc.mutex.Lock()
 	defer sc.mutex.Unlock()
-	var err error
 
 	log.Debugf("Time since last scrape: %f seconds", time.Since(sc.lastScrape).Seconds())
 	if time.Since(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
-
+		var err error
 		sc.sshClient, err = sc.sshConfig.NewClient()
 		if err != nil {
 			log.Errorf("Creating SSH client: %s", err.Error())
@@ -279,7 +278,6 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		sc.collectAcct()
 		sc.collectInfo()
 		sc.lastScrape = time.Now()
-		err = sc.sshClient.Close()
 		sc.delJobs()
 
 	}
@@ -371,16 +369,16 @@ func parseMem(s string) float64 {
 		return -1
 	}
 	if f, e := strconv.ParseFloat(s, 64); e == nil {
-		return f * 10e-6
+		return f
 	}
 	num, _ := strconv.ParseFloat(s[:len(s)-1], 64)
 	switch c := s[len(s)]; c {
 	case 'K', 'k':
-		return num * 10e-3
+		return num * 1e3
 	case 'M', 'm':
-		return num
+		return num * 1e6
 	case 'G', 'g':
-		return num * 10e3
+		return num * 1e9
 	}
 	return num
 

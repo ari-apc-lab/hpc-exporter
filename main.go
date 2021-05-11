@@ -124,7 +124,7 @@ func main() {
 	switch sched := *scheduler; sched {
 	case "pbs":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, ""))
+		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *scrapeInterval))
 	case "slurm":
 		log.Debugf("Registering collector for scheduler %s", sched)
 		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, *sshPrivKey, *sshKnownHosts, "", *sacctHistory, *scrapeInterval))
