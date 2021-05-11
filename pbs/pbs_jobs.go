@@ -35,7 +35,7 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 	for jobid, mapMetrics := range mapJobs {
 		pc.trackedJobs[jobid] = true
 		var startTime, createdTime time.Time
-		pc.clearMetrics(jobid)
+		pc.clearJobMetrics(jobid)
 		for key, value := range mapMetrics {
 			switch key {
 			case "Job_Name":
@@ -59,7 +59,7 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 			case "Resource_List.walltime":
 				pc.jobMetrics["JobWalltimeMax"][jobid], _ = parsePBSTime(value)
 
-			case " Walltime.Remaining":
+			case "Walltime.Remaining":
 				pc.jobMetrics["JobWalltimeRem"][jobid], _ = strconv.ParseFloat(value, 64)
 
 			case "resources_used.cput":
@@ -95,7 +95,7 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 	log.Infof("Collected jobs: %d", len(mapJobs))
 }
 
-func (pc *PBSCollector) clearMetrics(jobid string) {
+func (pc *PBSCollector) clearJobMetrics(jobid string) {
 	/*We give default values to all the metrics, they will be overwritten with the collected values if they exist, otherwise they keep these values.
 	For example, if the job hasn't started running, the memory metrics will stay at 0. This way we also ensure that all the metrics exist as well*/
 	pc.jobMetrics["JobState"][jobid] = -1

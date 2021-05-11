@@ -77,6 +77,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 		mutex:          &sync.Mutex{},
 	}
 	newerPBSCollector.jobMetrics["JobState"] = make(map[string]float64)
+	newerPBSCollector.jobMetrics["JobPriority"] = make(map[string]float64)
 	newerPBSCollector.jobMetrics["JobWalltimeUsed"] = make(map[string]float64)
 	newerPBSCollector.jobMetrics["JobWalltimeMax"] = make(map[string]float64)
 	newerPBSCollector.jobMetrics["JobWalltimeRem"] = make(map[string]float64)
@@ -87,6 +88,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 	newerPBSCollector.jobMetrics["JobRSS"] = make(map[string]float64)
 	newerPBSCollector.jobMetrics["JobExitStatus"] = make(map[string]float64)
 	newerPBSCollector.qMetrics["QueueTotal"] = make(map[string]float64)
+	newerPBSCollector.qMetrics["QueueMax"] = make(map[string]float64)
 	newerPBSCollector.qMetrics["QueueEnabled"] = make(map[string]float64)
 	newerPBSCollector.qMetrics["QueueStarted"] = make(map[string]float64)
 	newerPBSCollector.qMetrics["QueueQueued"] = make(map[string]float64)
@@ -121,6 +123,13 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 	newerPBSCollector.descPtrMap["JobState"] = prometheus.NewDesc(
 		"pbs_job_state",
 		"job current state",
+		jobtags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["JobPriority"] = prometheus.NewDesc(
+		"pbs_job_priority",
+		"job current priority",
 		jobtags,
 		nil,
 	)
@@ -191,6 +200,13 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKno
 	newerPBSCollector.descPtrMap["QueueTotal"] = prometheus.NewDesc(
 		"pbs_queue_jobs_total",
 		"queue total number of jobs assigned",
+		queuetags,
+		nil,
+	)
+
+	newerPBSCollector.descPtrMap["QueueMax"] = prometheus.NewDesc(
+		"pbs_queue_jobs_max",
+		"queue max number of jobs",
 		queuetags,
 		nil,
 	)
@@ -390,10 +406,11 @@ func parseBlocks(buf io.Reader) (map[string](map[string](string)), error) {
 				return result, nil
 			} else if err != nil {
 				return result, err
-			} else if len(line) == 0 {
-				break
 			}
 			split_line = strings.Split(line, "=")
+			if len(split_line) < 2 {
+				break
+			}
 			result[label][strings.TrimSpace(split_line[0])] = strings.TrimSpace(split_line[1])
 		}
 	}
