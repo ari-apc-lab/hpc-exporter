@@ -74,7 +74,7 @@ func NewSSHConfigByCertificate(user, key_file, host string, port int) *SSHConfig
 }
 */
 
-func NewSSHConfigByPublicKeys(user, host string, port int, private_key_path string, known_hosts_path string) *SSHConfig {
+func NewSSHConfigByPublicKeys(user, host string, port int, key []byte, known_hosts_path string) *SSHConfig {
 
 	// A public key may be used to authenticate against the remote
 	// server by using an unencrypted PEM-encoded private key file.
@@ -83,13 +83,6 @@ func NewSSHConfigByPublicKeys(user, host string, port int, private_key_path stri
 	// can be used to decrypt it.
 
 	log.Info("Trying to create a SSHConfig of type NewSSHConfigByPublicKeys...")
-
-	key, err := ioutil.ReadFile(private_key_path)
-	if err != nil {
-		log.Fatalf("unable to read private key: %v", err)
-	} else {
-		log.Info("Local private key file read")
-	}
 
 	// Create the Signer for this private key.
 	signer, err := ssh.ParsePrivateKey(key)

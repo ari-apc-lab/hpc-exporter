@@ -125,6 +125,7 @@ func main() {
 				log.Fatalf("unable to read private key file: %v", err)
 			} else {
 				log.Info("Local private key file read")
+				*sshAuthMethod = "keypair"
 			}
 		case "keypair":
 			//				if (*sshPrivKey == "" || *sshKnownHosts == "") {
