@@ -70,7 +70,7 @@ var (
 	)
 
 	sacctHistory = flag.Int(
-		"sacctHistory",
+		"sacct-history",
 		5,
 		"Jobs reported will be the ones submitted this many days back. Default is 5",
 	)

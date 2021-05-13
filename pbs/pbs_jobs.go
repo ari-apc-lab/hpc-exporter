@@ -106,7 +106,7 @@ func (pc *PBSCollector) clearJobMetrics(jobid string) {
 	pc.jobMetrics["JobCPUTime"][jobid] = 0
 	pc.jobMetrics["JobVMEM"][jobid] = 0
 	pc.jobMetrics["JobRSS"][jobid] = 0
-	pc.jobMetrics["JobExitStatus"][jobid] = -1
+	pc.jobMetrics["JobExitStatus"][jobid] = -50
 	pc.jobMetrics["JobNCPUs"][jobid] = 0
 	pc.jobMetrics["JobQueued"][jobid] = 0
 }

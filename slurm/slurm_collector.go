@@ -184,21 +184,21 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 	)
 
 	newerSlurmCollector.descPtrMap["JobWalltime"] = prometheus.NewDesc(
-		"slurm_job_walltime",
+		"slurm_job_walltime_used",
 		"job current walltime",
 		jobtags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["JobNCPUs"] = prometheus.NewDesc(
-		"slurm_job_ncpus",
+		"slurm_job_cpu_n",
 		"job ncpus assigned",
 		jobtags,
 		nil,
 	)
 
 	newerSlurmCollector.descPtrMap["JobVMEM"] = prometheus.NewDesc(
-		"slurm_job_maxvmem",
+		"slurm_job_memory_virtual_max",
 		"job maximum virtual memory consumed",
 		jobtags,
 		nil,
@@ -212,7 +212,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 	)
 
 	newerSlurmCollector.descPtrMap["JobRSS"] = prometheus.NewDesc(
-		"slurm_job_maxrss",
+		"slurm_job_memory_physical_max",
 		"job maximum Resident Set Size",
 		jobtags,
 		nil,
