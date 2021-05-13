@@ -64,7 +64,7 @@ type PBSCollector struct {
 	mutex          *sync.Mutex
 }
 
-func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, scrapeInterval int) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int) *PBSCollector {
 	newerPBSCollector := &PBSCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sshClient:      nil,

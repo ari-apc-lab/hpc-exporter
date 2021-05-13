@@ -132,7 +132,7 @@ type SlurmCollector struct {
 	mutex          *sync.Mutex
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass, sshPrivKey, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int) *SlurmCollector {
+func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sacctHistory:   sacct_History,

@@ -62,10 +62,10 @@ topology_template:
         - host: sodalite-vm
         - dependency: docker-host
 
-    monitoring-system-hpc-exporter-ssh-key-config:
-      type: sodalite.nodes.monitoring-system-hpc-exporter.config
-      properties:
-        ssh-key-file-path: { get_input: ssh-key-file-path }
+ #   monitoring-system-hpc-exporter-ssh-key-config:
+ #     type: sodalite.nodes.monitoring-system-hpc-exporter.config
+ #       properties:
+ #         ssh-key-file-path: { get_input: ssh-key-file-path }
  
     monitoring-system-hpc-exporter:
       type: sodalite.nodes.DockerizedComponent
@@ -83,4 +83,4 @@ topology_template:
         - host: sodalite-vm
         - network: docker-network
         - registry: docker-public-registry
-        - dependency: monitoring-system-hpc-exporter-ssh-key-config
+#        - dependency: monitoring-system-hpc-exporter-ssh-key-config
