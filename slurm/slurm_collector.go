@@ -165,7 +165,7 @@ type SlurmCollector struct {
 	jLabels        map[string](map[string](string))
 	pLabels        map[string](map[string](string))
 	mutex          *sync.Mutex
-	targetJobIds   []string
+	targetJobIds   string
 }
 
 func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds string) *SlurmCollector {
@@ -182,7 +182,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 		jLabels:        make(map[string](map[string](string))),
 		pLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
-		targetJobIds:   make([]string, 0),
+		targetJobIds:   targetJobIds,
 	}
 
 	switch authmethod := sshAuthMethod; authmethod {
@@ -211,11 +211,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 		newerSlurmCollector.pLabels[label] = make(map[string]string)
 	}
 
-	if targetJobIds != "" {
-		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
-		newerSlurmCollector.targetJobIds = strings.Split(targetJobIds, ",")
-	}
-	log.Infof("Target jobs, if specified: %s %d", newerSlurmCollector.targetJobIds, len(newerSlurmCollector.targetJobIds))
+	log.Infof("Target jobs, if specified: %s", newerSlurmCollector.targetJobIds)
 
 	return newerSlurmCollector
 }
@@ -246,7 +242,9 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		defer sc.sshClient.Close()
 		log.Infof("Collecting metrics from Slurm...")
 		sc.trackedJobs = make(map[string]bool)
-		sc.collectQueu()
+		if sc.targetJobIds == "" {
+			sc.collectQueue()
+		}
 		sc.collectAcct()
 		sc.collectInfo()
 		sc.lastScrape = time.Now()

@@ -45,6 +45,10 @@ func (sc *SlurmCollector) collectAcct() {
 	startTime := getstarttime(sc.sacctHistory)
 	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,Reserved,ElapsedRaw,MaxVMSize,MaxRSS\" -p -S " + startTime
 
+	if sc.targetJobIds != "" {
+		acctCommand += " -j \"" + sc.targetJobIds + "\""
+	}
+
 	session := ssh.ExecuteSSHCommand(acctCommand, sc.sshClient)
 	if session != nil {
 		defer session.CloseSession()
@@ -64,7 +68,7 @@ func (sc *SlurmCollector) collectAcct() {
 		}
 		jobid := fields[accJOBID]
 		state := strings.Fields(fields[accSTATE])[0]
-		if (state == "RUNNING" || state == "COMPLETING") && notContains(sc.runningJobs, jobid) {
+		if (sc.targetJobIds == "") && (state == "RUNNING" || state == "COMPLETING") && notContains(sc.runningJobs, jobid) {
 			continue
 		}
 
@@ -83,7 +87,12 @@ func (sc *SlurmCollector) collectAcct() {
 		collected++
 	}
 
-	log.Infof("%d finished jobs collected", collected)
+	if sc.targetJobIds == "" {
+		log.Infof("%d finished jobs collected", collected)
+	} else {
+		log.Infof("%d jobs collected", collected)
+	}
+
 }
 
 func sacctLineParser(line string) []string {

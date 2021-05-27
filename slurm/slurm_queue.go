@@ -36,7 +36,7 @@ const (
 	qFIELDS
 )
 
-func (sc *SlurmCollector) collectQueu() {
+func (sc *SlurmCollector) collectQueue() {
 	log.Debugln("Collecting Queue metrics...")
 	var collected uint
 	sc.runningJobs = nil

@@ -108,7 +108,7 @@ type PBSCollector struct {
 	jLabels        map[string](map[string](string))
 	qLabels        map[string](map[string](string))
 	mutex          *sync.Mutex
-	targetJobIds   []string
+	targetJobIds   string
 }
 
 func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds string) *PBSCollector {
@@ -123,7 +123,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey 
 		jLabels:        make(map[string](map[string](string))),
 		qLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
-		targetJobIds:   make([]string, 0),
+		targetJobIds:   targetJobIds,
 	}
 
 	switch authmethod := sshAuthMethod; authmethod {
@@ -152,11 +152,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey 
 		newerPBSCollector.qLabels[label] = make(map[string]string)
 	}
 
-	if targetJobIds != "" {
-		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
-		newerPBSCollector.targetJobIds = strings.Split(targetJobIds, ",")
-	}
-	log.Infof("Target jobs, if specified: %s %d", newerPBSCollector.targetJobIds, len(newerPBSCollector.targetJobIds))
+	log.Infof("Target jobs, if specified: %s", newerPBSCollector.targetJobIds)
 
 	return newerPBSCollector
 }
