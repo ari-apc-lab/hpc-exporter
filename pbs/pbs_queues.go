@@ -35,10 +35,11 @@ func (pc *PBSCollector) collectQueues(ch chan<- prometheus.Metric) {
 
 	for queue, mapMetrics := range mapQueues {
 		pc.clearQueueMetrics(queue)
+		pc.qLabels["queue_name"][queue] = queue
 		for key, value := range mapMetrics {
 			switch key {
 			case "queue_Type":
-				pc.labels["QueueType"][queue] = value
+				pc.qLabels["queue_type"][queue] = value
 			case "total_jobs":
 				pc.qMetrics["QueueTotal"][queue], _ = strconv.ParseFloat(value, 64)
 			case "state_count":

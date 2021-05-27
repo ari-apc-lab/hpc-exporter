@@ -69,16 +69,17 @@ func (sc *SlurmCollector) collectAcct() {
 		}
 
 		sc.trackedJobs[jobid] = true
-		sc.labels["JobName"][jobid] = fields[accNAME]
-		sc.labels["JobUser"][jobid] = fields[accUSERNAME]
-		sc.labels["JobPart"][jobid] = fields[accPARTITION]
+		sc.jLabels["job_id"][jobid] = jobid
+		sc.jLabels["job_name"][jobid] = fields[accNAME]
+		sc.jLabels["job_user"][jobid] = fields[accUSERNAME]
+		sc.jLabels["job_partition"][jobid] = fields[accPARTITION]
 
-		sc.jobMetrics["JobState"][jobid] = float64(LongStatusDict[state])
-		sc.jobMetrics["JobWalltime"][jobid], _ = strconv.ParseFloat(fields[accELAPSED], 64)
-		sc.jobMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
-		sc.jobMetrics["JobQueued"][jobid] = computeSlurmTime(fields[accRESERVED])
-		sc.jobMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
-		sc.jobMetrics["JobRSS"][jobid] = parseMem(fields[accRSS])
+		sc.jMetrics["JobState"][jobid] = float64(LongStatusDict[state])
+		sc.jMetrics["JobWalltime"][jobid], _ = strconv.ParseFloat(fields[accELAPSED], 64)
+		sc.jMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
+		sc.jMetrics["JobQueued"][jobid] = computeSlurmTime(fields[accRESERVED])
+		sc.jMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
+		sc.jMetrics["JobRSS"][jobid] = parseMem(fields[accRSS])
 		collected++
 	}
 

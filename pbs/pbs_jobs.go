@@ -35,51 +35,52 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 	for jobid, mapMetrics := range mapJobs {
 		pc.trackedJobs[jobid] = true
 		var startTime, createdTime time.Time
-		pc.clearJobMetrics(jobid)
+		pc.clearjMetrics(jobid)
+		pc.jLabels["job_id"][jobid] = jobid
 		for key, value := range mapMetrics {
 			switch key {
 			case "Job_Name":
-				pc.labels["JobName"][jobid] = value
+				pc.jLabels["job_name"][jobid] = value
 
 			case "euser":
-				pc.labels["JobUser"][jobid] = value
+				pc.jLabels["job_user"][jobid] = value
 
 			case "queue":
-				pc.labels["JobQueue"][jobid] = value
+				pc.jLabels["job_queue"][jobid] = value
 
 			case "job_state":
-				pc.jobMetrics["JobState"][jobid] = float64(StatusDict[value])
+				pc.jMetrics["JobState"][jobid] = float64(StatusDict[value])
 
 			case "Priority":
-				pc.jobMetrics["JobPriority"][jobid], _ = strconv.ParseFloat(value, 64)
+				pc.jMetrics["JobPriority"][jobid], _ = strconv.ParseFloat(value, 64)
 
 			case "resources_used.walltime":
-				pc.jobMetrics["JobWalltimeUsed"][jobid], _ = parsePBSTime(value)
+				pc.jMetrics["JobWalltimeUsed"][jobid], _ = parsePBSTime(value)
 
 			case "Resource_List.walltime":
-				pc.jobMetrics["JobWalltimeMax"][jobid], _ = parsePBSTime(value)
+				pc.jMetrics["JobWalltimeMax"][jobid], _ = parsePBSTime(value)
 
 			case "Walltime.Remaining":
-				pc.jobMetrics["JobWalltimeRem"][jobid], _ = strconv.ParseFloat(value, 64)
+				pc.jMetrics["JobWalltimeRem"][jobid], _ = strconv.ParseFloat(value, 64)
 
 			case "resources_used.cput":
-				pc.jobMetrics["JobCPUTime"][jobid], _ = parsePBSTime(value)
+				pc.jMetrics["JobCPUTime"][jobid], _ = parsePBSTime(value)
 
 			case "resources_used.vmem":
 				if mem, err := parseMem(value); err == nil {
-					pc.jobMetrics["JobVMEM"][jobid] = mem
+					pc.jMetrics["JobVMEM"][jobid] = mem
 				}
 
 			case "resources_used.mem":
 				if mem, err := parseMem(value); err == nil {
-					pc.jobMetrics["JobRSS"][jobid] = mem
+					pc.jMetrics["JobRSS"][jobid] = mem
 				}
 
 			case "exit_status":
-				pc.jobMetrics["JobExitStatus"][jobid], _ = strconv.ParseFloat(value, 64)
+				pc.jMetrics["JobExitStatus"][jobid], _ = strconv.ParseFloat(value, 64)
 
 			case "req_information.task_usage.0.task.0.threads ":
-				pc.jobMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(value, 64)
+				pc.jMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(value, 64)
 
 			case "ctime":
 				createdTime, _ = parsePBSDateTime(value)
@@ -89,24 +90,24 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 			}
 
 		}
-		pc.jobMetrics["JobQueued"][jobid] = startTime.Sub(createdTime).Seconds()
+		pc.jMetrics["JobQueued"][jobid] = startTime.Sub(createdTime).Seconds()
 	}
 
 	log.Infof("Collected jobs: %d", len(mapJobs))
 }
 
-func (pc *PBSCollector) clearJobMetrics(jobid string) {
+func (pc *PBSCollector) clearjMetrics(jobid string) {
 	/*We give default values to all the metrics, they will be overwritten with the collected values if they exist, otherwise they keep these values.
 	For example, if the job hasn't started running, the memory metrics will stay at 0. This way we also ensure that all the metrics exist as well*/
-	pc.jobMetrics["JobState"][jobid] = -1
-	pc.jobMetrics["JobPriority"][jobid] = -1
-	pc.jobMetrics["JobWalltimeUsed"][jobid] = 0
-	pc.jobMetrics["JobWalltimeMax"][jobid] = 0
-	pc.jobMetrics["JobWalltimeRem"][jobid] = -1
-	pc.jobMetrics["JobCPUTime"][jobid] = 0
-	pc.jobMetrics["JobVMEM"][jobid] = 0
-	pc.jobMetrics["JobRSS"][jobid] = 0
-	pc.jobMetrics["JobExitStatus"][jobid] = -50
-	pc.jobMetrics["JobNCPUs"][jobid] = 0
-	pc.jobMetrics["JobQueued"][jobid] = 0
+	pc.jMetrics["JobState"][jobid] = -1
+	pc.jMetrics["JobPriority"][jobid] = -1
+	pc.jMetrics["JobWalltimeUsed"][jobid] = 0
+	pc.jMetrics["JobWalltimeMax"][jobid] = 0
+	pc.jMetrics["JobWalltimeRem"][jobid] = -1
+	pc.jMetrics["JobCPUTime"][jobid] = 0
+	pc.jMetrics["JobVMEM"][jobid] = 0
+	pc.jMetrics["JobRSS"][jobid] = 0
+	pc.jMetrics["JobExitStatus"][jobid] = -50
+	pc.jMetrics["JobNCPUs"][jobid] = 0
+	pc.jMetrics["JobQueued"][jobid] = 0
 }

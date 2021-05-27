@@ -113,6 +113,40 @@ var LongStatusDict = map[string]int{
 	"TIMEOUT":       sTIMEOUT,
 }
 
+var jobtags = []string{
+	"job_id",
+	"job_name",
+	"job_user",
+	"job_partition",
+}
+
+var partitiontags = []string{
+	"partition",
+}
+
+type PromMetricDesc struct {
+	name               string
+	desc               string
+	variableLabelsTags []string
+	constLabels        prometheus.Labels
+	isJob              bool
+}
+
+var metrics = map[string]PromMetricDesc{
+	"JobState":    {"slurm_job_state", "job current state", jobtags, nil, true},
+	"JobWalltime": {"slurm_job_walltime_used", "job current walltime", jobtags, nil, true},
+	"JobNCPUs":    {"slurm_job_cpu_n", "job ncpus assigned", jobtags, nil, true},
+	"JobVMEM":     {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, nil, true},
+	"JobQueued":   {"slurm_job_queued", "job time in the queue", jobtags, nil, true},
+	"JobRSS":      {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, nil, true},
+	"JobExitR":    {"slurm_job_exit_code_rhs", "right hand side of slurm exit code", jobtags, nil, true},
+	"JobExitL":    {"slurm_job_exit_code_lhs", "left hand side of slurm exit code", jobtags, nil, true},
+	"PartAvai":    {"slurm_partition_availability", "partition availability", partitiontags, nil, false},
+	"PartIdle":    {"slurm_partition_cores_idle", "partition number of idle cores", partitiontags, nil, false},
+	"PartAllo":    {"slurm_partition_cores_allocated", "partition number of allocated cores", partitiontags, nil, false},
+	"PartTota":    {"slurm_partition_cores_total", "partition number of total cores", partitiontags, nil, false},
+}
+
 type CollectFunc func(ch chan<- prometheus.Metric)
 
 type trackedList []string
@@ -126,13 +160,15 @@ type SlurmCollector struct {
 	trackedJobs    map[string]bool
 	scrapeInterval int
 	lastScrape     time.Time
-	jobMetrics     map[string](map[string](float64))
-	parMetrics     map[string](map[string](float64))
-	labels         map[string](map[string](string))
+	jMetrics       map[string](map[string](float64))
+	pMetrics       map[string](map[string](float64))
+	jLabels        map[string](map[string](string))
+	pLabels        map[string](map[string](string))
 	mutex          *sync.Mutex
+	targetJobIds   []string
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int) *SlurmCollector {
+func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds string) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sacctHistory:   sacct_History,
@@ -141,24 +177,14 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 		trackedJobs:    make(map[string]bool),
 		scrapeInterval: scrapeInterval,
 		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * scrapeInterval)))),
-		jobMetrics:     make(map[string](map[string](float64))),
-		parMetrics:     make(map[string](map[string](float64))),
-		labels:         make(map[string](map[string](string))),
+		jMetrics:       make(map[string](map[string](float64))),
+		pMetrics:       make(map[string](map[string](float64))),
+		jLabels:        make(map[string](map[string](string))),
+		pLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
+		targetJobIds:   make([]string, 0),
 	}
-	newerSlurmCollector.jobMetrics["JobState"] = make(map[string]float64)
-	newerSlurmCollector.jobMetrics["JobWalltime"] = make(map[string]float64)
-	newerSlurmCollector.jobMetrics["JobNCPUs"] = make(map[string]float64)
-	newerSlurmCollector.jobMetrics["JobVMEM"] = make(map[string]float64)
-	newerSlurmCollector.jobMetrics["JobQueued"] = make(map[string]float64)
-	newerSlurmCollector.jobMetrics["JobRSS"] = make(map[string]float64)
-	newerSlurmCollector.parMetrics["PartAvai"] = make(map[string]float64)
-	newerSlurmCollector.parMetrics["PartIdle"] = make(map[string]float64)
-	newerSlurmCollector.parMetrics["PartAllo"] = make(map[string]float64)
-	newerSlurmCollector.parMetrics["PartTota"] = make(map[string]float64)
-	newerSlurmCollector.labels["JobName"] = make(map[string]string)
-	newerSlurmCollector.labels["JobUser"] = make(map[string]string)
-	newerSlurmCollector.labels["JobPart"] = make(map[string]string)
+
 	switch authmethod := sshAuthMethod; authmethod {
 	case "keypair":
 		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(sshUser, host, 22, sshPrivKey, sshKnownHosts)
@@ -168,83 +194,29 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
-	jobtags := []string{
-		"job_id", "job_name", "job_user", "job_partition",
+	for key, metric := range metrics {
+		newerSlurmCollector.descPtrMap[key] = prometheus.NewDesc(metric.name, metric.desc, metric.variableLabelsTags, metric.constLabels)
+		if metric.isJob {
+			newerSlurmCollector.jMetrics[key] = make(map[string]float64)
+		} else {
+			newerSlurmCollector.pMetrics[key] = make(map[string]float64)
+		}
 	}
 
-	partitiontags := []string{
-		"partition",
+	for _, label := range jobtags {
+		newerSlurmCollector.jLabels[label] = make(map[string]string)
 	}
 
-	newerSlurmCollector.descPtrMap["JobState"] = prometheus.NewDesc(
-		"slurm_job_state",
-		"job current state",
-		jobtags,
-		nil,
-	)
+	for _, label := range partitiontags {
+		newerSlurmCollector.pLabels[label] = make(map[string]string)
+	}
 
-	newerSlurmCollector.descPtrMap["JobWalltime"] = prometheus.NewDesc(
-		"slurm_job_walltime_used",
-		"job current walltime",
-		jobtags,
-		nil,
-	)
+	if targetJobIds != "" {
+		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
+		newerSlurmCollector.targetJobIds = strings.Split(targetJobIds, ",")
+	}
+	log.Infof("Target jobs, if specified: %s %d", newerSlurmCollector.targetJobIds, len(newerSlurmCollector.targetJobIds))
 
-	newerSlurmCollector.descPtrMap["JobNCPUs"] = prometheus.NewDesc(
-		"slurm_job_cpu_n",
-		"job ncpus assigned",
-		jobtags,
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["JobVMEM"] = prometheus.NewDesc(
-		"slurm_job_memory_virtual_max",
-		"job maximum virtual memory consumed",
-		jobtags,
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["JobQueued"] = prometheus.NewDesc(
-		"slurm_job_queued",
-		"job time in the queue",
-		jobtags,
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["JobRSS"] = prometheus.NewDesc(
-		"slurm_job_memory_physical_max",
-		"job maximum Resident Set Size",
-		jobtags,
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["PartAvai"] = prometheus.NewDesc(
-		"slurm_partition_availability",
-		"partition availability",
-		partitiontags,
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["PartIdle"] = prometheus.NewDesc(
-		"slurm_partition_cores_idle",
-		"partition number of idle cores",
-		partitiontags,
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["PartAllo"] = prometheus.NewDesc(
-		"slurm_partition_cores_alloc",
-		"partition number of allocated cores",
-		partitiontags,
-		nil,
-	)
-
-	newerSlurmCollector.descPtrMap["PartTota"] = prometheus.NewDesc(
-		"slurm_partition_cores_total",
-		"partition number of total cores",
-		partitiontags,
-		nil,
-	)
 	return newerSlurmCollector
 }
 
@@ -388,26 +360,34 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 
 	log.Infof("Refreshing exposed metrics")
 
-	for metric, elem := range sc.jobMetrics {
+	for metric, elem := range sc.jMetrics {
 
 		for jobid, value := range elem {
+			labels := make([]string, len(sc.jLabels))
+			for i, key := range jobtags {
+				labels[i] = sc.jLabels[key][jobid]
+			}
 			ch <- prometheus.MustNewConstMetric(
 				sc.descPtrMap[metric],
 				prometheus.GaugeValue,
 				value,
-				jobid, sc.labels["JobName"][jobid], sc.labels["JobUser"][jobid], sc.labels["JobPart"][jobid],
+				labels...,
 			)
 		}
 	}
 
-	for metric, elem := range sc.parMetrics {
+	for metric, elem := range sc.pMetrics {
 
 		for partition, value := range elem {
+			labels := make([]string, len(sc.pLabels))
+			for i, key := range partitiontags {
+				labels[i] = sc.pLabels[key][partition]
+			}
 			ch <- prometheus.MustNewConstMetric(
 				sc.descPtrMap[metric],
 				prometheus.GaugeValue,
 				value,
-				partition,
+				labels...,
 			)
 		}
 	}
@@ -419,7 +399,7 @@ func (sc *SlurmCollector) delJobs() {
 	i := 0
 	for job, tracked := range sc.trackedJobs {
 		if !tracked {
-			for _, elems := range sc.jobMetrics {
+			for _, elems := range sc.jMetrics {
 				delete(elems, job)
 				i++
 			}

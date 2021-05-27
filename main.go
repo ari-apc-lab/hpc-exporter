@@ -86,6 +86,12 @@ var (
 		"error",
 		"Log level of the Application.",
 	)
+
+	targetJobIds = flag.String(
+		"job-ids",
+		"",
+		"Comma-separated ids of the specific HPC jobs to monitor. Keep it unset to monitor all the user's jobs.",
+	)
 )
 
 func main() {
@@ -153,10 +159,10 @@ func main() {
 	switch sched := *scheduler; sched {
 	case "pbs":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *scrapeInterval))
+		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *scrapeInterval, *targetJobIds))
 	case "slurm":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *sacctHistory, *scrapeInterval))
+		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *sacctHistory, *scrapeInterval, *targetJobIds))
 	default:
 		log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}

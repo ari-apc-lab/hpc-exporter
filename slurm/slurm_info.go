@@ -74,11 +74,11 @@ func (sc *SlurmCollector) collectInfo() {
 			log.Warnf(err.Error())
 			return
 		}
-
-		sc.parMetrics["PartAvai"][partition] = float64(availability)
-		sc.parMetrics["PartIdle"][partition] = float64(idle)
-		sc.parMetrics["PartAllo"][partition] = float64(allocated)
-		sc.parMetrics["PartTota"][partition] = float64(total)
+		sc.pLabels["partition"][partition] = partition
+		sc.pMetrics["PartAvai"][partition] = float64(availability)
+		sc.pMetrics["PartIdle"][partition] = float64(idle)
+		sc.pMetrics["PartAllo"][partition] = float64(allocated)
+		sc.pMetrics["PartTota"][partition] = float64(total)
 
 		collected++
 

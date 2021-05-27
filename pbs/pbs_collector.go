@@ -51,6 +51,51 @@ var StatusDict = map[string]int{
 	"S": pSUSPENDED,
 }
 
+var jobtags = []string{
+	"job_id",
+	"job_name",
+	"job_user",
+	"job_queue",
+}
+
+var queuetags = []string{
+	"queue_name",
+	"queue_type",
+}
+
+type PromMetricDesc struct {
+	name               string
+	desc               string
+	variableLabelsTags []string
+	constLabels        prometheus.Labels
+	isJob              bool
+}
+
+var metrics = map[string]PromMetricDesc{
+	"JobState":        {"pbs_job_state", "job current state", jobtags, nil, true},
+	"JobPriority":     {"pbs_job_priority", "job current priority", jobtags, nil, true},
+	"JobWalltimeUsed": {"pbs_job_walltime_used", "job walltime used, time the job has been running (sec)", jobtags, nil, true},
+	"JobWalltimeMax":  {"pbs_job_walltime_max", "job maximum walltime allowed (sec)", jobtags, nil, true},
+	"JobWalltimeRem":  {"pbs_job_walltime_remaining", "job walltime remaining (sec)", jobtags, nil, true},
+	"JobCPUTime":      {"pbs_job_cpu_time", "job cpu time expended (sec)", jobtags, nil, true},
+	"JobNCPUs":        {"pbs_job_cpu_n", "job number of threads requested by the job", jobtags, nil, true},
+	"JobVMEM":         {"pbs_job_mem_virtual", "job virtual memory used", jobtags, nil, true},
+	"JobQueued":       {"pbs_job_time_queued", "job time spent between creation and running start (or now)", jobtags, nil, true},
+	"JobRSS":          {"pbs_job_memory_physical", "job physical memory used", jobtags, nil, true},
+	"JobExitStatus":   {"pbs_job_exit_status", "job exit status. -1 if not completed", jobtags, nil, true},
+	"QueueTotal":      {"pbs_queue_jobs_total", "queue total number of jobs assigned", queuetags, nil, false},
+	"QueueMax":        {"pbs_queue_jobs_max", "queue max number of jobs", queuetags, nil, false},
+	"QueueEnabled":    {"pbs_queue_enabled", "queue if enabled 1, disabled 0", queuetags, nil, false},
+	"QueueStarted":    {"pbs_queue_started", "queue if started 1, stopped 0", queuetags, nil, false},
+	"QueueQueued":     {"pbs_queue_jobs_queued", "number of jobs in a queued state in this queue", queuetags, nil, false},
+	"QueueRunning":    {"pbs_queue_jobs_running", "number of jobs in a running state in this queue", queuetags, nil, false},
+	"QueueHeld":       {"pbs_queue_jobs_held", "number of jobs in a held state in this queue", queuetags, nil, false},
+	"QueueWaiting":    {"pbs_queue_jobs_waiting", "number of jobs in a waiting state in this queue", queuetags, nil, false},
+	"QueueTransit":    {"pbs_queue_jobs_transit", "number of jobs in a transit state in this queue", queuetags, nil, false},
+	"QueueExiting":    {"pbs_queue_jobs_exiting", "number of jobs in a exiting state in this queue", queuetags, nil, false},
+	"QueueComplete":   {"pbs_queue_jobs_complete", "number of jobs in a complete state in this queue", queuetags, nil, false},
+}
+
 type PBSCollector struct {
 	descPtrMap     map[string](*prometheus.Desc)
 	trackedJobs    map[string]bool
@@ -58,50 +103,28 @@ type PBSCollector struct {
 	sshClient      *ssh.SSHClient
 	scrapeInterval int
 	lastScrape     time.Time
-	jobMetrics     map[string](map[string](float64))
+	jMetrics       map[string](map[string](float64))
 	qMetrics       map[string](map[string](float64))
-	labels         map[string](map[string](string))
+	jLabels        map[string](map[string](string))
+	qLabels        map[string](map[string](string))
 	mutex          *sync.Mutex
+	targetJobIds   []string
 }
 
-func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds string) *PBSCollector {
 	newerPBSCollector := &PBSCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sshClient:      nil,
 		trackedJobs:    make(map[string]bool),
 		scrapeInterval: scrapeInterval,
 		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * scrapeInterval)))),
-		jobMetrics:     make(map[string](map[string](float64))),
+		jMetrics:       make(map[string](map[string](float64))),
 		qMetrics:       make(map[string](map[string](float64))),
-		labels:         make(map[string](map[string](string))),
+		jLabels:        make(map[string](map[string](string))),
+		qLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
+		targetJobIds:   make([]string, 0),
 	}
-	newerPBSCollector.jobMetrics["JobState"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobPriority"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobWalltimeUsed"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobWalltimeMax"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobWalltimeRem"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobCPUTime"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobNCPUs"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobVMEM"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobQueued"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobRSS"] = make(map[string]float64)
-	newerPBSCollector.jobMetrics["JobExitStatus"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueTotal"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueMax"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueEnabled"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueStarted"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueQueued"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueRunning"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueHeld"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueWaiting"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueTransit"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueExiting"] = make(map[string]float64)
-	newerPBSCollector.qMetrics["QueueComplete"] = make(map[string]float64)
-	newerPBSCollector.labels["JobName"] = make(map[string]string)
-	newerPBSCollector.labels["JobUser"] = make(map[string]string)
-	newerPBSCollector.labels["JobQueue"] = make(map[string]string)
-	newerPBSCollector.labels["QueueType"] = make(map[string]string)
 
 	switch authmethod := sshAuthMethod; authmethod {
 	case "keypair":
@@ -112,167 +135,28 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey 
 		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 	}
 
-	jobtags := []string{
-		"job_id", "job_name", "job_user", "job_queue",
+	for key, metric := range metrics {
+		newerPBSCollector.descPtrMap[key] = prometheus.NewDesc(metric.name, metric.desc, metric.variableLabelsTags, metric.constLabels)
+		if metric.isJob {
+			newerPBSCollector.jMetrics[key] = make(map[string]float64)
+		} else {
+			newerPBSCollector.qMetrics[key] = make(map[string]float64)
+		}
 	}
 
-	queuetags := []string{
-		"queue_name", "queue_type",
+	for _, label := range jobtags {
+		newerPBSCollector.jLabels[label] = make(map[string]string)
 	}
 
-	newerPBSCollector.descPtrMap["JobState"] = prometheus.NewDesc(
-		"pbs_job_state",
-		"job current state",
-		jobtags,
-		nil,
-	)
+	for _, label := range queuetags {
+		newerPBSCollector.qLabels[label] = make(map[string]string)
+	}
 
-	newerPBSCollector.descPtrMap["JobPriority"] = prometheus.NewDesc(
-		"pbs_job_priority",
-		"job current priority",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobWalltimeUsed"] = prometheus.NewDesc(
-		"pbs_job_walltime_used",
-		"job walltime used, time the job has been running (sec)",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobWalltimeMax"] = prometheus.NewDesc(
-		"pbs_job_walltime_max",
-		"job maximum walltime allowed (sec)",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobWalltimeRem"] = prometheus.NewDesc(
-		"pbs_job_walltime_remaining",
-		"job walltime remaining (sec)",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobCPUTime"] = prometheus.NewDesc(
-		"pbs_job_cpu_time",
-		"job cpu time expended (sec)",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobNCPUs"] = prometheus.NewDesc(
-		"pbs_job_cpu_n",
-		"job number of threads requested by the job",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobVMEM"] = prometheus.NewDesc(
-		"pbs_job_mem_virtual",
-		"job virtual memory used",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobQueued"] = prometheus.NewDesc(
-		"pbs_job_time_queued",
-		"job time spent between creation and running start (or now)",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobRSS"] = prometheus.NewDesc(
-		"pbs_job_memory_physical",
-		"job physical memory used",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["JobExitStatus"] = prometheus.NewDesc(
-		"pbs_job_exit_status",
-		"job exit status. -1 if not completed",
-		jobtags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueTotal"] = prometheus.NewDesc(
-		"pbs_queue_jobs_total",
-		"queue total number of jobs assigned",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueMax"] = prometheus.NewDesc(
-		"pbs_queue_jobs_max",
-		"queue max number of jobs",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueEnabled"] = prometheus.NewDesc(
-		"pbs_queue_enabled",
-		"queue if enabled 1, disabled 0",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueStarted"] = prometheus.NewDesc(
-		"pbs_queue_started",
-		"queue if started 1, stopped 0",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueQueued"] = prometheus.NewDesc(
-		"pbs_queue_jobs_queued",
-		"number of jobs in a queued state in this queue",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueRunning"] = prometheus.NewDesc(
-		"pbs_queue_jobs_running",
-		"number of jobs in a running state in this queue",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueHeld"] = prometheus.NewDesc(
-		"pbs_queue_jobs_held",
-		"number of jobs in a held state in this queue",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueWaiting"] = prometheus.NewDesc(
-		"pbs_queue_jobs_waiting",
-		"number of jobs in a waiting state in this queue",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueTransit"] = prometheus.NewDesc(
-		"pbs_queue_jobs_transit",
-		"number of jobs in a transit state in this queue",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueExiting"] = prometheus.NewDesc(
-		"pbs_queue_jobs_exiting",
-		"number of jobs in a exiting state in this queue",
-		queuetags,
-		nil,
-	)
-
-	newerPBSCollector.descPtrMap["QueueComplete"] = prometheus.NewDesc(
-		"pbs_queue_jobs_complete",
-		"number of jobs in a complete state in this queue",
-		queuetags,
-		nil,
-	)
+	if targetJobIds != "" {
+		targetJobIds = strings.TrimFunc(targetJobIds, func(r rune) bool { return r == ',' })
+		newerPBSCollector.targetJobIds = strings.Split(targetJobIds, ",")
+	}
+	log.Infof("Target jobs, if specified: %s %d", newerPBSCollector.targetJobIds, len(newerPBSCollector.targetJobIds))
 
 	return newerPBSCollector
 }
@@ -420,26 +304,33 @@ func (pc *PBSCollector) updateMetrics(ch chan<- prometheus.Metric) {
 
 	log.Infof("Refreshing exposed metrics")
 
-	for metric, elem := range pc.jobMetrics {
+	for metric, elem := range pc.jMetrics {
 
 		for jobid, value := range elem {
+			labels := make([]string, len(pc.jLabels))
+			for i, key := range jobtags {
+				labels[i] = pc.jLabels[key][jobid]
+			}
 			ch <- prometheus.MustNewConstMetric(
 				pc.descPtrMap[metric],
 				prometheus.GaugeValue,
 				value,
-				jobid, pc.labels["JobName"][jobid], pc.labels["JobUser"][jobid], pc.labels["JobQueue"][jobid],
+				labels...,
 			)
 		}
 	}
-
 	for metric, elem := range pc.qMetrics {
 
 		for queue, value := range elem {
+			labels := make([]string, len(pc.qLabels))
+			for i, key := range queuetags {
+				labels[i] = pc.qLabels[key][queue]
+			}
 			ch <- prometheus.MustNewConstMetric(
 				pc.descPtrMap[metric],
 				prometheus.GaugeValue,
 				value,
-				queue, pc.labels["QueueType"][queue],
+				labels...,
 			)
 		}
 	}
@@ -450,7 +341,7 @@ func (sc *PBSCollector) delJobs() {
 	i := 0
 	for job, tracked := range sc.trackedJobs {
 		if !tracked {
-			for _, elems := range sc.jobMetrics {
+			for _, elems := range sc.jMetrics {
 				delete(elems, job)
 				i++
 			}
