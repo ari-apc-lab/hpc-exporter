@@ -61,7 +61,7 @@ go build
 ```
 3. Run the exporter
 ```
-hpc_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> [-sacct-history <HISTORY>] -ssh-user <USER> -ssh-auth-method <AUTH> [-ssh-password <PASS> | -ssh-known-hosts <PATH> [-ssh-priv-key-file <PATH> | -ssh-priv-key <KEY>]]  -log-level=<LOGLEVEL> -scrape-interval <INTERVAL>
+hpc_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> [-sacct-history <HISTORY>] -ssh-user <USER> -ssh-auth-method <AUTH> [-ssh-password <PASS> | -ssh-known-hosts <PATH> [-ssh-priv-key-file <PATH> | -ssh-priv-key <KEY>]]  -log-level=<LOGLEVEL> -scrape-interval <INTERVAL> -job-ids <JOBID LIST>
 ```
 - `<HOST>`: HPC frontend address. `localhost` as default, not supported.
 - `<PORT>`: Port the metrics will be exposed on for prometheus. `:9110` as default.   
@@ -71,6 +71,7 @@ hpc_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> [-sacct-hist
 - `<AUTH>`: SSH authentication method used on the HPC frontend. See **Authentication methods** below for details
 - `<LOGLEVEL>`: Logging level. `error` as default, `warn`, `info` and `debug` also supported
 - `<INTERVAL>`: Minimum amount of time in seconds between each query to the HPC frontend. Default 300.
+- `<JOBID LIST>`: List of Job IDs to monitor. Separated by commas. If not set, all jobs by the user will be monitored.
 
 ### Dockerization
 Check the [README.md](docker/README.md) file in [`docker`](docker) folder for instructions about Docker deployment of HPC exporters
