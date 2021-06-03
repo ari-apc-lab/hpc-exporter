@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -166,9 +167,12 @@ type SlurmCollector struct {
 	pLabels        map[string](map[string](string))
 	mutex          *sync.Mutex
 	targetJobIds   string
+	staticJobIds   []string
+	dynamicJobIds  []string
+	targetJobsFile string
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds string) *SlurmCollector {
+func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds, targetJobsFile string) *SlurmCollector {
 	newerSlurmCollector := &SlurmCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sacctHistory:   sacct_History,
@@ -182,8 +186,12 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 		jLabels:        make(map[string](map[string](string))),
 		pLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
-		targetJobIds:   targetJobIds,
+		staticJobIds:   strings.Split(targetJobIds, ","), //Statically tracked JobIds (through the arguments)
+		dynamicJobIds:  make([]string, 0),                //Dynamically tracked JobIds (through a file)
+		targetJobsFile: targetJobsFile,                   //File where the dynamically tracked JobIds are stored. If equal to "" there is no dynamic tracking
 	}
+
+	newerSlurmCollector.updateDynamicJobIds()
 
 	switch authmethod := sshAuthMethod; authmethod {
 	case "keypair":
@@ -233,6 +241,7 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 
 	log.Debugf("Time since last scrape: %f seconds", time.Since(sc.lastScrape).Seconds())
 	if time.Since(sc.lastScrape).Seconds() > float64(sc.scrapeInterval) {
+		sc.updateDynamicJobIds()
 		var err error
 		sc.sshClient, err = sc.sshConfig.NewClient()
 		if err != nil {
@@ -404,4 +413,18 @@ func (sc *SlurmCollector) delJobs() {
 		}
 	}
 	log.Debugf("%d old jobs deleted", i)
+}
+
+func (sc *SlurmCollector) updateDynamicJobIds() {
+	if sc.targetJobsFile != "" {
+		if fileBytes, err := os.ReadFile(sc.targetJobsFile); err == nil {
+			fileStr := string(fileBytes)
+			fileStr = strings.Trim(fileStr, "\n")
+			sc.dynamicJobIds = strings.Split(fileStr, "\n")
+		} else {
+			log.Warnf("Could not open the dynamic target Job IDs file: %s", sc.targetJobsFile)
+		}
+	}
+	//Join the static and dynamic jobIds in a single string separated by commas
+	sc.targetJobIds = strings.Join([]string{strings.Join(sc.staticJobIds, ","), strings.Join(sc.dynamicJobIds, ",")}, ",")
 }

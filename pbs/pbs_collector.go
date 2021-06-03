@@ -5,6 +5,7 @@ import (
 	"errors"
 	"hpc_exporter/ssh"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -109,9 +110,12 @@ type PBSCollector struct {
 	qLabels        map[string](map[string](string))
 	mutex          *sync.Mutex
 	targetJobIds   string
+	staticJobIds   []string
+	dynamicJobIds  []string
+	targetJobsFile string
 }
 
-func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds string) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds, targetJobsFile string) *PBSCollector {
 	newerPBSCollector := &PBSCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sshClient:      nil,
@@ -123,8 +127,12 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey 
 		jLabels:        make(map[string](map[string](string))),
 		qLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
-		targetJobIds:   targetJobIds,
+		staticJobIds:   strings.Split(targetJobIds, ","),
+		dynamicJobIds:  make([]string, 0),
+		targetJobsFile: targetJobsFile,
 	}
+
+	newerPBSCollector.updateDynamicJobIds()
 
 	switch authmethod := sshAuthMethod; authmethod {
 	case "keypair":
@@ -152,7 +160,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey 
 		newerPBSCollector.qLabels[label] = make(map[string]string)
 	}
 
-	log.Infof("Target jobs, if specified: %s", newerPBSCollector.targetJobIds)
+	log.Infof("Target jobs, if specified: %s", newerPBSCollector.staticJobIds)
 
 	return newerPBSCollector
 }
@@ -171,9 +179,10 @@ func (pc *PBSCollector) Describe(ch chan<- *prometheus.Desc) {
 func (pc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 	pc.mutex.Lock()
 	defer pc.mutex.Unlock()
-
 	log.Debugf("Time since last scrape: %f seconds", time.Since(pc.lastScrape).Seconds())
+
 	if time.Since(pc.lastScrape).Seconds() > float64(pc.scrapeInterval) {
+		pc.updateDynamicJobIds()
 		var err error
 		pc.sshClient, err = pc.sshConfig.NewClient()
 		if err != nil {
@@ -376,4 +385,17 @@ func parseMem(s string) (float64, error) {
 func parsePBSDateTime(s string) (time.Time, error) {
 	format := "Mon Jan 2 15:04:05 2006"
 	return time.Parse(format, s)
+}
+
+func (pc *PBSCollector) updateDynamicJobIds() {
+	if pc.targetJobsFile != "" {
+		if fileBytes, err := os.ReadFile(pc.targetJobsFile); err == nil {
+			fileStr := string(fileBytes)
+			fileStr = strings.Trim(fileStr, "\n")
+			pc.dynamicJobIds = strings.Split(fileStr, "\n")
+		} else {
+			log.Warnf("Could not open the dynamic target Job IDs file: %s", pc.targetJobsFile)
+		}
+	}
+	pc.targetJobIds = strings.Join([]string{strings.Join(pc.staticJobIds, ","), strings.Join(pc.dynamicJobIds, ",")}, ",") //We join the static and dynamic jobIds in a single string separated by commas
 }
