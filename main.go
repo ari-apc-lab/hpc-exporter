@@ -72,7 +72,7 @@ var (
 	sacctHistory = flag.Int(
 		"sacct-history",
 		5,
-		"Jobs reported will be the ones submitted this many days back. Default is 5",
+		"If no target JobIds are given, jobs reported will be the ones submitted this many days back. Default is 5. Only applicable to Slurm",
 	)
 
 	scrapeInterval = flag.Int(
