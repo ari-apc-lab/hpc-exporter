@@ -43,10 +43,12 @@ func (sc *SlurmCollector) collectAcct() {
 	var collected uint
 
 	startTime := getstarttime(sc.sacctHistory)
-	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,Reserved,ElapsedRaw,MaxVMSize,MaxRSS\" -p -S " + startTime
+	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,Reserved,ElapsedRaw,MaxVMSize,MaxRSS\" -p"
 
 	if sc.targetJobIds != "" {
 		acctCommand += " -j \"" + sc.targetJobIds + "\""
+	} else {
+		acctCommand += " -S " + startTime
 	}
 
 	session := ssh.ExecuteSSHCommand(acctCommand, sc.sshClient)
