@@ -426,5 +426,7 @@ func (sc *SlurmCollector) updateDynamicJobIds() {
 		}
 	}
 	//Join the static and dynamic jobIds in a single string separated by commas
-	sc.targetJobIds = strings.Join([]string{strings.Join(sc.staticJobIds, ","), strings.Join(sc.dynamicJobIds, ",")}, ",")
+	targetJobIds := strings.Join([]string{strings.Join(sc.staticJobIds, ","), strings.Join(sc.dynamicJobIds, ",")}, ",") //We join the static and dynamic jobIds in a single string separated by commas
+
+	sc.targetJobIds = strings.Trim(targetJobIds, ",")
 }

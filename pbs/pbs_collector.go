@@ -397,5 +397,7 @@ func (pc *PBSCollector) updateDynamicJobIds() {
 			log.Warnf("Could not open the dynamic target Job IDs file: %s", pc.targetJobsFile)
 		}
 	}
-	pc.targetJobIds = strings.Join([]string{strings.Join(pc.staticJobIds, ","), strings.Join(pc.dynamicJobIds, ",")}, ",") //We join the static and dynamic jobIds in a single string separated by commas
+	targetJobIds := strings.Join([]string{strings.Join(pc.staticJobIds, ","), strings.Join(pc.dynamicJobIds, ",")}, ",") //We join the static and dynamic jobIds in a single string separated by commas
+
+	pc.targetJobIds = strings.Trim(targetJobIds, ",")
 }
