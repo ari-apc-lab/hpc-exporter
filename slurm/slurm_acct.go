@@ -33,6 +33,7 @@ const (
 	accNCPUS
 	accRESERVED
 	accELAPSED
+	accEXITCODE
 	accVMEM
 	accRSS
 	accFIELDS
@@ -43,7 +44,7 @@ func (sc *SlurmCollector) collectAcct() {
 	var collected uint
 
 	startTime := getstarttime(sc.sacctHistory)
-	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,Reserved,ElapsedRaw,MaxVMSize,MaxRSS\" -p"
+	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,Reserved,ElapsedRaw,ExitCode,MaxVMSize,MaxRSS\" -p"
 
 	if sc.targetJobIds != "" {
 		acctCommand += " -j \"" + sc.targetJobIds + "\""
@@ -84,6 +85,7 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.jMetrics["JobWalltime"][jobid], _ = strconv.ParseFloat(fields[accELAPSED], 64)
 		sc.jMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
 		sc.jMetrics["JobQueued"][jobid] = computeSlurmTime(fields[accRESERVED])
+		sc.jMetrics["JobExitCode"][jobid], sc.jMetrics["JobExitSignal"][jobid] = slurmExitCode(fields[accEXITCODE])
 		sc.jMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
 		sc.jMetrics["JobRSS"][jobid] = parseMem(fields[accRSS])
 		collected++
@@ -106,4 +108,15 @@ func sacctLineParser(line string) []string {
 	}
 
 	return fields
+}
+
+func slurmExitCode(s string) (float64, float64) {
+	spl := strings.Split(s, ":")
+	if exitCode, err := strconv.ParseFloat(spl[0], 64); err != nil {
+		return -50, -50
+	} else if exitSignal, err2 := strconv.ParseFloat(spl[1], 64); err2 != nil {
+		return -50, -50
+	} else {
+		return exitCode, exitSignal
+	}
 }

@@ -134,18 +134,18 @@ type PromMetricDesc struct {
 }
 
 var metrics = map[string]PromMetricDesc{
-	"JobState":    {"slurm_job_state", "job current state", jobtags, nil, true},
-	"JobWalltime": {"slurm_job_walltime_used", "job current walltime", jobtags, nil, true},
-	"JobNCPUs":    {"slurm_job_cpu_n", "job ncpus assigned", jobtags, nil, true},
-	"JobVMEM":     {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, nil, true},
-	"JobQueued":   {"slurm_job_queued", "job time in the queue", jobtags, nil, true},
-	"JobRSS":      {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, nil, true},
-	"JobExitR":    {"slurm_job_exit_code_rhs", "right hand side of slurm exit code", jobtags, nil, true},
-	"JobExitL":    {"slurm_job_exit_code_lhs", "left hand side of slurm exit code", jobtags, nil, true},
-	"PartAvai":    {"slurm_partition_availability", "partition availability", partitiontags, nil, false},
-	"PartIdle":    {"slurm_partition_cores_idle", "partition number of idle cores", partitiontags, nil, false},
-	"PartAllo":    {"slurm_partition_cores_allocated", "partition number of allocated cores", partitiontags, nil, false},
-	"PartTota":    {"slurm_partition_cores_total", "partition number of total cores", partitiontags, nil, false},
+	"JobState":      {"slurm_job_state", "job current state", jobtags, nil, true},
+	"JobWalltime":   {"slurm_job_walltime_used", "job current walltime", jobtags, nil, true},
+	"JobNCPUs":      {"slurm_job_cpu_n", "job ncpus assigned", jobtags, nil, true},
+	"JobVMEM":       {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, nil, true},
+	"JobQueued":     {"slurm_job_queued", "job time in the queue", jobtags, nil, true},
+	"JobRSS":        {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, nil, true},
+	"JobExitCode":   {"slurm_job_exit_code", "job exit code", jobtags, nil, true},
+	"JobExitSignal": {"slurm_job_exit_signal", "job exit signal that caused the exit code", jobtags, nil, true},
+	"PartAvai":      {"slurm_partition_availability", "partition availability", partitiontags, nil, false},
+	"PartIdle":      {"slurm_partition_cores_idle", "partition number of idle cores", partitiontags, nil, false},
+	"PartAllo":      {"slurm_partition_cores_allocated", "partition number of allocated cores", partitiontags, nil, false},
+	"PartTota":      {"slurm_partition_cores_total", "partition number of total cores", partitiontags, nil, false},
 }
 
 type CollectFunc func(ch chan<- prometheus.Metric)
