@@ -71,32 +71,6 @@ type PromMetricDesc struct {
 	constLabels        prometheus.Labels
 	isJob              bool
 }
-
-var metrics = map[string]PromMetricDesc{
-	"JobState":        {"pbs_job_state", "job current state", jobtags, nil, true},
-	"JobPriority":     {"pbs_job_priority", "job current priority", jobtags, nil, true},
-	"JobWalltimeUsed": {"pbs_job_walltime_used", "job walltime used, time the job has been running (sec)", jobtags, nil, true},
-	"JobWalltimeMax":  {"pbs_job_walltime_max", "job maximum walltime allowed (sec)", jobtags, nil, true},
-	"JobWalltimeRem":  {"pbs_job_walltime_remaining", "job walltime remaining (sec)", jobtags, nil, true},
-	"JobCPUTime":      {"pbs_job_cpu_time", "job cpu time expended (sec)", jobtags, nil, true},
-	"JobNCPUs":        {"pbs_job_cpu_n", "job number of threads requested by the job", jobtags, nil, true},
-	"JobVMEM":         {"pbs_job_mem_virtual", "job virtual memory used", jobtags, nil, true},
-	"JobQueued":       {"pbs_job_time_queued", "job time spent between creation and running start (or now)", jobtags, nil, true},
-	"JobRSS":          {"pbs_job_memory_physical", "job physical memory used", jobtags, nil, true},
-	"JobExitStatus":   {"pbs_job_exit_status", "job exit status. -1 if not completed", jobtags, nil, true},
-	"QueueTotal":      {"pbs_queue_jobs_total", "queue total number of jobs assigned", queuetags, nil, false},
-	"QueueMax":        {"pbs_queue_jobs_max", "queue max number of jobs", queuetags, nil, false},
-	"QueueEnabled":    {"pbs_queue_enabled", "queue if enabled 1, disabled 0", queuetags, nil, false},
-	"QueueStarted":    {"pbs_queue_started", "queue if started 1, stopped 0", queuetags, nil, false},
-	"QueueQueued":     {"pbs_queue_jobs_queued", "number of jobs in a queued state in this queue", queuetags, nil, false},
-	"QueueRunning":    {"pbs_queue_jobs_running", "number of jobs in a running state in this queue", queuetags, nil, false},
-	"QueueHeld":       {"pbs_queue_jobs_held", "number of jobs in a held state in this queue", queuetags, nil, false},
-	"QueueWaiting":    {"pbs_queue_jobs_waiting", "number of jobs in a waiting state in this queue", queuetags, nil, false},
-	"QueueTransit":    {"pbs_queue_jobs_transit", "number of jobs in a transit state in this queue", queuetags, nil, false},
-	"QueueExiting":    {"pbs_queue_jobs_exiting", "number of jobs in a exiting state in this queue", queuetags, nil, false},
-	"QueueComplete":   {"pbs_queue_jobs_complete", "number of jobs in a complete state in this queue", queuetags, nil, false},
-}
-
 type PBSCollector struct {
 	descPtrMap     map[string](*prometheus.Desc)
 	trackedJobs    map[string]bool
@@ -115,7 +89,33 @@ type PBSCollector struct {
 	targetJobsFile string
 }
 
-func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds, targetJobsFile string) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds, targetJobsFile string, constLabels prometheus.Labels) *PBSCollector {
+
+	var metrics = map[string]PromMetricDesc{
+		"JobState":        {"pbs_job_state", "job current state", jobtags, constLabels, true},
+		"JobPriority":     {"pbs_job_priority", "job current priority", jobtags, constLabels, true},
+		"JobWalltimeUsed": {"pbs_job_walltime_used", "job walltime used, time the job has been running (sec)", jobtags, constLabels, true},
+		"JobWalltimeMax":  {"pbs_job_walltime_max", "job maximum walltime allowed (sec)", jobtags, constLabels, true},
+		"JobWalltimeRem":  {"pbs_job_walltime_remaining", "job walltime remaining (sec)", jobtags, constLabels, true},
+		"JobCPUTime":      {"pbs_job_cpu_time", "job cpu time expended (sec)", jobtags, constLabels, true},
+		"JobNCPUs":        {"pbs_job_cpu_n", "job number of threads requested by the job", jobtags, constLabels, true},
+		"JobVMEM":         {"pbs_job_mem_virtual", "job virtual memory used", jobtags, constLabels, true},
+		"JobQueued":       {"pbs_job_time_queued", "job time spent between creation and running start (or now)", jobtags, constLabels, true},
+		"JobRSS":          {"pbs_job_memory_physical", "job physical memory used", jobtags, constLabels, true},
+		"JobExitStatus":   {"pbs_job_exit_status", "job exit status. -1 if not completed", jobtags, constLabels, true},
+		"QueueTotal":      {"pbs_queue_jobs_total", "queue total number of jobs assigned", queuetags, constLabels, false},
+		"QueueMax":        {"pbs_queue_jobs_max", "queue max number of jobs", queuetags, constLabels, false},
+		"QueueEnabled":    {"pbs_queue_enabled", "queue if enabled 1, disabled 0", queuetags, constLabels, false},
+		"QueueStarted":    {"pbs_queue_started", "queue if started 1, stopped 0", queuetags, constLabels, false},
+		"QueueQueued":     {"pbs_queue_jobs_queued", "number of jobs in a queued state in this queue", queuetags, constLabels, false},
+		"QueueRunning":    {"pbs_queue_jobs_running", "number of jobs in a running state in this queue", queuetags, constLabels, false},
+		"QueueHeld":       {"pbs_queue_jobs_held", "number of jobs in a held state in this queue", queuetags, constLabels, false},
+		"QueueWaiting":    {"pbs_queue_jobs_waiting", "number of jobs in a waiting state in this queue", queuetags, constLabels, false},
+		"QueueTransit":    {"pbs_queue_jobs_transit", "number of jobs in a transit state in this queue", queuetags, constLabels, false},
+		"QueueExiting":    {"pbs_queue_jobs_exiting", "number of jobs in a exiting state in this queue", queuetags, constLabels, false},
+		"QueueComplete":   {"pbs_queue_jobs_complete", "number of jobs in a complete state in this queue", queuetags, constLabels, false},
+	}
+
 	newerPBSCollector := &PBSCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sshClient:      nil,

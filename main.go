@@ -98,6 +98,12 @@ var (
 		"",
 		"Path where the jobIds to monitor are stored. Used to dynamically change them. If it is not used, no dynamic monitoring of jobs will be performed",
 	)
+
+	deploymentLabel = flag.String(
+		"deployment-label",
+		"no_label",
+		"Deployment label of which the exporter is a part of.",
+	)
 )
 
 func main() {
@@ -161,14 +167,16 @@ func main() {
 			log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
 		}
 	}
+	constLabels := make(prometheus.Labels)
+	constLabels["deployment_label"] = *deploymentLabel
 
 	switch sched := *scheduler; sched {
 	case "pbs":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *scrapeInterval, *targetJobIds, *targetJobsFile))
+		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *scrapeInterval, *targetJobIds, *targetJobsFile, constLabels))
 	case "slurm":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *sacctHistory, *scrapeInterval, *targetJobIds, *targetJobsFile))
+		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *sacctHistory, *scrapeInterval, *targetJobIds, *targetJobsFile, constLabels))
 	default:
 		log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}

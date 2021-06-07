@@ -133,21 +133,6 @@ type PromMetricDesc struct {
 	isJob              bool
 }
 
-var metrics = map[string]PromMetricDesc{
-	"JobState":      {"slurm_job_state", "job current state", jobtags, nil, true},
-	"JobWalltime":   {"slurm_job_walltime_used", "job current walltime", jobtags, nil, true},
-	"JobNCPUs":      {"slurm_job_cpu_n", "job ncpus assigned", jobtags, nil, true},
-	"JobVMEM":       {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, nil, true},
-	"JobQueued":     {"slurm_job_queued", "job time in the queue", jobtags, nil, true},
-	"JobRSS":        {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, nil, true},
-	"JobExitCode":   {"slurm_job_exit_code", "job exit code", jobtags, nil, true},
-	"JobExitSignal": {"slurm_job_exit_signal", "job exit signal that caused the exit code", jobtags, nil, true},
-	"PartAvai":      {"slurm_partition_availability", "partition availability", partitiontags, nil, false},
-	"PartIdle":      {"slurm_partition_cores_idle", "partition number of idle cores", partitiontags, nil, false},
-	"PartAllo":      {"slurm_partition_cores_allocated", "partition number of allocated cores", partitiontags, nil, false},
-	"PartTota":      {"slurm_partition_cores_total", "partition number of total cores", partitiontags, nil, false},
-}
-
 type CollectFunc func(ch chan<- prometheus.Metric)
 
 type trackedList []string
@@ -172,7 +157,23 @@ type SlurmCollector struct {
 	targetJobsFile string
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds, targetJobsFile string) *SlurmCollector {
+func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds, targetJobsFile string, constLabels prometheus.Labels) *SlurmCollector {
+
+	var metrics = map[string]PromMetricDesc{
+		"JobState":      {"slurm_job_state", "job current state", jobtags, constLabels, true},
+		"JobWalltime":   {"slurm_job_walltime_used", "job current walltime", jobtags, constLabels, true},
+		"JobNCPUs":      {"slurm_job_cpu_n", "job ncpus assigned", jobtags, constLabels, true},
+		"JobVMEM":       {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, constLabels, true},
+		"JobQueued":     {"slurm_job_queued", "job time in the queue", jobtags, constLabels, true},
+		"JobRSS":        {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, constLabels, true},
+		"JobExitCode":   {"slurm_job_exit_code", "job exit code", jobtags, constLabels, true},
+		"JobExitSignal": {"slurm_job_exit_signal", "job exit signal that caused the exit code", jobtags, constLabels, true},
+		"PartAvai":      {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
+		"PartIdle":      {"slurm_partition_cores_idle", "partition number of idle cores", partitiontags, constLabels, false},
+		"PartAllo":      {"slurm_partition_cores_allocated", "partition number of allocated cores", partitiontags, constLabels, false},
+		"PartTota":      {"slurm_partition_cores_total", "partition number of total cores", partitiontags, constLabels, false},
+	}
+
 	newerSlurmCollector := &SlurmCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sacctHistory:   sacct_History,
