@@ -104,6 +104,12 @@ var (
 		"no_label",
 		"Deployment label of which the exporter is a part of.",
 	)
+
+	hpcLabel = flag.String(
+		"hpc-label",
+		"no_label",
+		"Name of the HPC. Will be the value on the hpc label on all metrics",
+	)
 )
 
 func main() {
@@ -169,6 +175,7 @@ func main() {
 	}
 	constLabels := make(prometheus.Labels)
 	constLabels["deployment_label"] = *deploymentLabel
+	constLabels["hpc"] = *hpcLabel
 
 	switch sched := *scheduler; sched {
 	case "pbs":
