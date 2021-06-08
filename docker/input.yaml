@@ -1,10 +1,11 @@
-username: jorge
+username: ubuntu
 docker-network: sodalite
-ssh-key-file-path: /home/jorge/.ssh/id_rsa
+docker-public-registry-url: registry.hub.docker.com
+ssh-key-file-path: /home/ubuntu/.ssh/hlrs
 hpc-exporter-env:
   HPC_FRONTEND=sodalite-fe.hlrs.de
-  EXPORTER_PORT=9100
+  EXPORTER_PORT=9110
   SCHEDULER=pbs
-  SSH_USER=jorge
+  SSH_USER=jesus
   LOG_LEVEL=info
-  JOBLIST=
+  SSH_PRIV_KEY=

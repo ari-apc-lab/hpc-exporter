@@ -14,8 +14,7 @@ import (
 	"golang.org/x/crypto/ssh/agent"
 	knownhosts "golang.org/x/crypto/ssh/knownhosts"
 
-        log "github.com/sirupsen/logrus"
-
+	log "github.com/sirupsen/logrus"
 )
 
 type SSHCommand struct {
@@ -75,34 +74,27 @@ func NewSSHConfigByCertificate(user, key_file, host string, port int) *SSHConfig
 }
 */
 
-func NewSSHConfigByPublicKeys(user, host string, port int, private_key_path string, known_hosts_path string) *SSHConfig {
+func NewSSHConfigByPublicKeys(user, host string, port int, key []byte, known_hosts_path string) *SSHConfig {
 
-        // A public key may be used to authenticate against the remote
-        // server by using an unencrypted PEM-encoded private key file.
-        //
-        // If you have an encrypted private key, the crypto/x509 package
-        // can be used to decrypt it.
+	// A public key may be used to authenticate against the remote
+	// server by using an unencrypted PEM-encoded private key file.
+	//
+	// If you have an encrypted private key, the crypto/x509 package
+	// can be used to decrypt it.
 
 	log.Info("Trying to create a SSHConfig of type NewSSHConfigByPublicKeys...")
 
-        key, err := ioutil.ReadFile(private_key_path)
-        if err != nil {
-                log.Fatalf("unable to read private key: %v", err)
-        } else {
-		log.Info("Local private key file read")
-	}
-
-        // Create the Signer for this private key.
-        signer, err := ssh.ParsePrivateKey(key)
-        if err != nil {
-                log.Fatalf("unable to parse private key: %v", err)
+	// Create the Signer for this private key.
+	signer, err := ssh.ParsePrivateKey(key)
+	if err != nil {
+		log.Fatalf("unable to parse private key: %v", err)
 	} else {
 		log.Info("Signer created for the parsed private key")
 	}
 
 	hostKeyCallback, err := knownhosts.New(known_hosts_path)
 	if err != nil {
-		if (known_hosts_path == "") {
+		if known_hosts_path == "" {
 			log.Warnln("SSH connection without known hosts checking is insecure")
 			hostKeyCallback = ssh.InsecureIgnoreHostKey()
 		} else {
@@ -112,19 +104,19 @@ func NewSSHConfigByPublicKeys(user, host string, port int, private_key_path stri
 		log.Info("Local known_hosts file parsed")
 	}
 
-        return &SSHConfig {
-                Config: &ssh.ClientConfig {
-                        User: user,
-                        Auth: []ssh.AuthMethod{
-                        // Use the PublicKeys method for remote authentication.
-                                ssh.PublicKeys(signer),
-                        },
-                        Timeout: 10 * time.Second,
-                        HostKeyCallback: hostKeyCallback,
-                },
-                Host: host,
-                Port: port,
-        }
+	return &SSHConfig{
+		Config: &ssh.ClientConfig{
+			User: user,
+			Auth: []ssh.AuthMethod{
+				// Use the PublicKeys method for remote authentication.
+				ssh.PublicKeys(signer),
+			},
+			Timeout:         10 * time.Second,
+			HostKeyCallback: hostKeyCallback,
+		},
+		Host: host,
+		Port: port,
+	}
 }
 
 func NewSSHConfigByAgent(user, host string, port int) *SSHConfig {
@@ -170,9 +162,24 @@ func (client *SSHClient) OpenSession(inBuffer, outBuffer, errBuffer *bytes.Buffe
 	// Setup the buffers
 	ses := &SSHSession{Session: session, InBuffer: inBuffer, OutBuffer: outBuffer, ErrBuffer: errBuffer}
 	if err := ses.setupSessionBuffers(); err != nil {
+		session.Close()
 		return nil, err
 	}
 	return ses, nil
+}
+
+func (s *SSHSession) CloseSession() {
+
+	log.Debugf("Closing session")
+
+	err := s.Close()
+	if err == nil {
+		log.Debugf("Session closed successfully")
+	} else if err == io.EOF {
+		log.Debugf("Session had already been closed: %s", err.Error())
+	} else {
+		log.Errorf("Session could not be closed properly: %s", err.Error())
+	}
 }
 
 func (session *SSHSession) setupSessionBuffers() error {
@@ -201,6 +208,39 @@ func (session *SSHSession) setupSessionBuffers() error {
 	}
 
 	return nil
+}
+
+func ExecuteSSHCommand(cmd string, client *SSHClient) *SSHSession {
+	command := &SSHCommand{
+		Path: cmd,
+		// Env:    []string{"LC_DIR=/usr"},
+	}
+
+	var outb, errb bytes.Buffer
+	session, err := client.OpenSession(nil, &outb, &errb)
+	if err == nil {
+		if err2 := session.RunCommand(command); err2 == nil {
+			return session
+		} else {
+			err_chunk, err3 := session.ErrBuffer.ReadString('\n')
+			errSsh := err_chunk
+			for ; err3 == nil; errSsh += err_chunk {
+				err_chunk, err3 = session.ErrBuffer.ReadString('\n')
+			}
+			err_chunk, err3 = session.OutBuffer.ReadString('\n')
+			errSsh += err_chunk
+			for ; err3 == nil; errSsh += err_chunk {
+				err_chunk, err3 = session.OutBuffer.ReadString('\n')
+			}
+			log.Errorf("Error: %s when executing SSH Command: %s", err2.Error(), cmd)
+			log.Debugf("Error was: " + errSsh)
+			return nil
+		}
+	} else {
+		log.Errorf("Error: %s when executing SSH Command: %s", err, cmd)
+		log.Debugf("Error opening session")
+		return nil
+	}
 }
 
 func (session *SSHSession) RunCommand(cmd *SSHCommand) error {
