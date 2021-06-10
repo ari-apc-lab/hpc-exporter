@@ -86,7 +86,7 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.jMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
 		sc.jMetrics["JobQueued"][jobid] = computeSlurmTime(fields[accRESERVED])
 		sc.jMetrics["JobExitCode"][jobid], sc.jMetrics["JobExitSignal"][jobid] = slurmExitCode(fields[accEXITCODE])
-		sc.jMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
+		sc.jMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accVMEM], 64)
 		sc.jMetrics["JobRSS"][jobid] = parseMem(fields[accRSS])
 		collected++
 	}
