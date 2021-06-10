@@ -110,6 +110,12 @@ var (
 		"no_label",
 		"Name of the HPC. Will be the value on the hpc label on all metrics",
 	)
+
+	skipInfra = flag.Bool(
+		"only-jobs",
+		false,
+		"Skip queue or partition metrics. False by default",
+	)
 )
 
 func main() {
@@ -180,10 +186,10 @@ func main() {
 	switch sched := *scheduler; sched {
 	case "pbs":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *scrapeInterval, *targetJobIds, *targetJobsFile, constLabels))
+		prometheus.MustRegister(pbs.NewerPBSCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *scrapeInterval, *targetJobIds, *targetJobsFile, constLabels, *skipInfra))
 	case "slurm":
 		log.Debugf("Registering collector for scheduler %s", sched)
-		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *sacctHistory, *scrapeInterval, *targetJobIds, *targetJobsFile, constLabels))
+		prometheus.MustRegister(slurm.NewerSlurmCollector(*host, *sshUser, *sshAuthMethod, *sshPass, key, *sshKnownHosts, "", *sacctHistory, *scrapeInterval, *targetJobIds, *targetJobsFile, constLabels, *skipInfra))
 	default:
 		log.Fatalf("The scheduler type provided (%s) is not supported.", sched)
 	}

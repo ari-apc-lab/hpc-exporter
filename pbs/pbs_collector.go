@@ -87,9 +87,10 @@ type PBSCollector struct {
 	staticJobIds   []string
 	dynamicJobIds  []string
 	targetJobsFile string
+	skipInfra      bool
 }
 
-func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds, targetJobsFile string, constLabels prometheus.Labels) *PBSCollector {
+func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, scrapeInterval int, targetJobIds, targetJobsFile string, constLabels prometheus.Labels, skipInfra bool) *PBSCollector {
 
 	var metrics = map[string]PromMetricDesc{
 		"JobState":        {"pbs_job_state", "job current state", jobtags, constLabels, true},
@@ -130,6 +131,7 @@ func NewerPBSCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey 
 		staticJobIds:   strings.Split(targetJobIds, ","),
 		dynamicJobIds:  make([]string, 0),
 		targetJobsFile: targetJobsFile,
+		skipInfra:      skipInfra,
 	}
 
 	newerPBSCollector.updateDynamicJobIds()
@@ -324,21 +326,24 @@ func (pc *PBSCollector) updateMetrics(ch chan<- prometheus.Metric) {
 			)
 		}
 	}
-	for metric, elem := range pc.qMetrics {
+	if !pc.skipInfra {
+		for metric, elem := range pc.qMetrics {
 
-		for queue, value := range elem {
-			labels := make([]string, len(pc.qLabels))
-			for i, key := range queuetags {
-				labels[i] = pc.qLabels[key][queue]
+			for queue, value := range elem {
+				labels := make([]string, len(pc.qLabels))
+				for i, key := range queuetags {
+					labels[i] = pc.qLabels[key][queue]
+				}
+				ch <- prometheus.MustNewConstMetric(
+					pc.descPtrMap[metric],
+					prometheus.GaugeValue,
+					value,
+					labels...,
+				)
 			}
-			ch <- prometheus.MustNewConstMetric(
-				pc.descPtrMap[metric],
-				prometheus.GaugeValue,
-				value,
-				labels...,
-			)
 		}
 	}
+
 }
 
 func (sc *PBSCollector) delJobs() {
@@ -362,12 +367,12 @@ func parseMem(s string) (float64, error) {
 	} else if f, e := strconv.ParseFloat(s, 64); e == nil {
 		return f, nil
 	} else if l <= 2 {
-		return 0, errors.New("Could not parse memory")
+		return 0, errors.New("could not parse memory")
 	}
 	num, err := strconv.ParseFloat(s[:l-2], 64)
 	if err != nil {
 
-		return 0, errors.New("Could not parse memory: " + err.Error())
+		return 0, errors.New("could not parse memory: " + err.Error())
 	}
 	switch c := s[l-2:]; c {
 	case "kb":
@@ -377,7 +382,7 @@ func parseMem(s string) (float64, error) {
 	case "gb":
 		num = num * 1e9
 	default:
-		return 0, errors.New("Could not parse memory")
+		return 0, errors.New("could not parse memory")
 	}
 	return num, nil
 }

@@ -155,9 +155,10 @@ type SlurmCollector struct {
 	staticJobIds   []string
 	dynamicJobIds  []string
 	targetJobsFile string
+	skipInfra      bool
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds, targetJobsFile string, constLabels prometheus.Labels) *SlurmCollector {
+func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds, targetJobsFile string, constLabels prometheus.Labels, skipInfra bool) *SlurmCollector {
 
 	var metrics = map[string]PromMetricDesc{
 		"JobState":      {"slurm_job_state", "job current state", jobtags, constLabels, true},
@@ -190,6 +191,7 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 		staticJobIds:   strings.Split(targetJobIds, ","), //Statically tracked JobIds (through the arguments)
 		dynamicJobIds:  make([]string, 0),                //Dynamically tracked JobIds (through a file)
 		targetJobsFile: targetJobsFile,                   //File where the dynamically tracked JobIds are stored. If equal to "" there is no dynamic tracking
+		skipInfra:      skipInfra,
 	}
 
 	newerSlurmCollector.updateDynamicJobIds()
