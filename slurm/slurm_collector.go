@@ -258,7 +258,9 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 			sc.collectQueue()
 		}
 		sc.collectAcct()
-		sc.collectInfo()
+		if !sc.skipInfra {
+			sc.collectInfo()
+		}
 		sc.lastScrape = time.Now()
 		sc.delJobs()
 
@@ -385,23 +387,23 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 			)
 		}
 	}
+	if !sc.skipInfra {
+		for metric, elem := range sc.pMetrics {
 
-	for metric, elem := range sc.pMetrics {
-
-		for partition, value := range elem {
-			labels := make([]string, len(sc.pLabels))
-			for i, key := range partitiontags {
-				labels[i] = sc.pLabels[key][partition]
+			for partition, value := range elem {
+				labels := make([]string, len(sc.pLabels))
+				for i, key := range partitiontags {
+					labels[i] = sc.pLabels[key][partition]
+				}
+				ch <- prometheus.MustNewConstMetric(
+					sc.descPtrMap[metric],
+					prometheus.GaugeValue,
+					value,
+					labels...,
+				)
 			}
-			ch <- prometheus.MustNewConstMetric(
-				sc.descPtrMap[metric],
-				prometheus.GaugeValue,
-				value,
-				labels...,
-			)
 		}
 	}
-
 }
 
 func (sc *SlurmCollector) delJobs() {

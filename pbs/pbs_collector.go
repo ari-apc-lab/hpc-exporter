@@ -195,7 +195,9 @@ func (pc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Infof("Collecting metrics from PBS...")
 		pc.trackedJobs = make(map[string]bool)
 		pc.collectJobs(ch)
-		pc.collectQueues(ch)
+		if !pc.skipInfra {
+			pc.collectQueues(ch)
+		}
 		pc.lastScrape = time.Now()
 		pc.delJobs()
 	}
