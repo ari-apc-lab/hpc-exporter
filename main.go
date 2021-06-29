@@ -111,6 +111,12 @@ var (
 		"Name of the HPC. Will be the value on the hpc label on all metrics",
 	)
 
+	deploymentID = flag.String(
+		"deployment-id",
+		"no_label",
+		"Deployment id of which the exporter is a part of.",
+	)
+
 	skipInfra = flag.Bool(
 		"only-jobs",
 		false,
@@ -182,6 +188,7 @@ func main() {
 	constLabels := make(prometheus.Labels)
 	constLabels["deployment_label"] = *deploymentLabel
 	constLabels["hpc"] = *hpcLabel
+	constLabels["deployment_id"] = *deploymentID
 
 	switch sched := *scheduler; sched {
 	case "pbs":
