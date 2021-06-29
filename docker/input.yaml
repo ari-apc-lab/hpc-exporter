@@ -9,3 +9,7 @@ hpc-exporter-env:
   SSH_USER=jesus
   LOG_LEVEL=info
   SSH_PRIV_KEY=
+  DEPLOYMENT_ID=
+  DEPLOYMENT_LABEL=
+  HPC_LABEL=HLRS
+  JOBLIST_FILE=

@@ -72,8 +72,8 @@ topology_template:
       properties:
         image_name: sodaliteh2020/hpc-exporter:latest
         restart_policy: "no"
-        ports: [ '9100:9100' ]
-        exposed_ports: [ '9100' ]
+        ports: [ '9110:9110' ]
+        exposed_ports: [ '9110' ]
         docker_network_name:  { get_property: [ SELF, network, name ] }
         env: { get_input: hpc-exporter-env }
         volumes:
