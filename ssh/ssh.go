@@ -12,7 +12,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
-	knownhosts "golang.org/x/crypto/ssh/knownhosts"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -57,24 +56,7 @@ func NewSSHConfigByPassword(user, password, host string, port int) *SSHConfig {
 	}
 }
 
-/*
-func NewSSHConfigByCertificate(user, key_file, host string, port int) *SSHConfig {
-	return &SSHConfig{
-		Config: &ssh.ClientConfig{
-			User: user,
-			Auth: []ssh.AuthMethod{
-				PublicKeyFile(key_file),
-			},
-			Timeout:         10 * time.Second,
-			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		},
-		Host: host,
-		Port: port,
-	}
-}
-*/
-
-func NewSSHConfigByPublicKeys(user, host string, port int, key []byte, known_hosts_path string) *SSHConfig {
+func NewSSHConfigByPublicKeys(user, host string, port int, key []byte) *SSHConfig {
 
 	// A public key may be used to authenticate against the remote
 	// server by using an unencrypted PEM-encoded private key file.
@@ -92,27 +74,12 @@ func NewSSHConfigByPublicKeys(user, host string, port int, key []byte, known_hos
 		log.Info("Signer created for the parsed private key")
 	}
 
-	hostKeyCallback, err := knownhosts.New(known_hosts_path)
-	if err != nil {
-		if known_hosts_path == "" {
-			log.Warnln("SSH connection without known hosts checking is insecure")
-			hostKeyCallback = ssh.InsecureIgnoreHostKey()
-		} else {
-			log.Fatalf("unable to parse local known_hosts file: %v", err)
-		}
-	} else {
-		log.Info("Local known_hosts file parsed")
-	}
-
 	return &SSHConfig{
 		Config: &ssh.ClientConfig{
-			User: user,
-			Auth: []ssh.AuthMethod{
-				// Use the PublicKeys method for remote authentication.
-				ssh.PublicKeys(signer),
-			},
+			User:            user,
+			Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
 			Timeout:         10 * time.Second,
-			HostKeyCallback: hostKeyCallback,
+			HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		},
 		Host: host,
 		Port: port,

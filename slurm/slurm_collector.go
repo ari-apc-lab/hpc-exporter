@@ -5,12 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"hpc_exporter/conf"
 	"hpc_exporter/ssh"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -152,13 +152,16 @@ type SlurmCollector struct {
 	pLabels        map[string](map[string](string))
 	mutex          *sync.Mutex
 	targetJobIds   string
-	staticJobIds   []string
-	dynamicJobIds  []string
-	targetJobsFile string
+	JobIds         []string
 	skipInfra      bool
 }
 
-func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKey []byte, sshKnownHosts, timeZone string, sacct_History, scrapeInterval int, targetJobIds, targetJobsFile string, constLabels prometheus.Labels, skipInfra bool) *SlurmCollector {
+func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
+
+	constLabels := make(prometheus.Labels)
+	constLabels["deployment_label"] = config.Deployment_label
+	constLabels["hpc"] = config.Hpc_label
+	constLabels["deployment_id"] = config.Monitoring_id
 
 	var metrics = map[string]PromMetricDesc{
 		"JobState":      {"slurm_job_state", "job current state", jobtags, constLabels, true},
@@ -177,32 +180,28 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 
 	newerSlurmCollector := &SlurmCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
-		sacctHistory:   sacct_History,
+		sacctHistory:   config.Sacct_history,
 		sshClient:      nil,
 		runningJobs:    make(trackedList, 0),
 		trackedJobs:    make(map[string]bool),
-		scrapeInterval: scrapeInterval,
-		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * scrapeInterval)))),
+		scrapeInterval: config.Scrape_interval,
+		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * config.Scrape_interval)))),
 		jMetrics:       make(map[string](map[string](float64))),
 		pMetrics:       make(map[string](map[string](float64))),
 		jLabels:        make(map[string](map[string](string))),
 		pLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
-		staticJobIds:   strings.Split(targetJobIds, ","), //Statically tracked JobIds (through the arguments)
-		dynamicJobIds:  make([]string, 0),                //Dynamically tracked JobIds (through a file)
-		targetJobsFile: targetJobsFile,                   //File where the dynamically tracked JobIds are stored. If equal to "" there is no dynamic tracking
-		skipInfra:      skipInfra,
+		JobIds:         []string{},
+		skipInfra:      config.Only_jobs,
 	}
 
 	newerSlurmCollector.updateDynamicJobIds()
 
-	switch authmethod := sshAuthMethod; authmethod {
+	switch authmethod := config.Auth_method; authmethod {
 	case "keypair":
-		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(sshUser, host, 22, sshPrivKey, sshKnownHosts)
+		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPublicKeys(config.User, config.Host, 22, []byte(config.Private_key))
 	case "password":
-		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPassword(sshUser, sshPass, host, 22)
-	default:
-		log.Fatalf("The authentication method provided (%s) is not supported.", authmethod)
+		newerSlurmCollector.sshConfig = ssh.NewSSHConfigByPassword(config.User, config.Password, config.Host, 22)
 	}
 
 	for key, metric := range metrics {
@@ -221,8 +220,6 @@ func NewerSlurmCollector(host, sshUser, sshAuthMethod, sshPass string, sshPrivKe
 	for _, label := range partitiontags {
 		newerSlurmCollector.pLabels[label] = make(map[string]string)
 	}
-
-	log.Infof("Target jobs, if specified: %s", newerSlurmCollector.targetJobIds)
 
 	return newerSlurmCollector
 }
@@ -421,17 +418,7 @@ func (sc *SlurmCollector) delJobs() {
 }
 
 func (sc *SlurmCollector) updateDynamicJobIds() {
-	if sc.targetJobsFile != "" {
-		if fileBytes, err := os.ReadFile(sc.targetJobsFile); err == nil {
-			fileStr := string(fileBytes)
-			fileStr = strings.Trim(fileStr, "\n")
-			sc.dynamicJobIds = strings.Split(fileStr, "\n")
-		} else {
-			log.Warnf("Could not open the dynamic target Job IDs file: %s", sc.targetJobsFile)
-		}
-	}
-	//Join the static and dynamic jobIds in a single string separated by commas
-	targetJobIds := strings.Join([]string{strings.Join(sc.staticJobIds, ","), strings.Join(sc.dynamicJobIds, ",")}, ",") //We join the static and dynamic jobIds in a single string separated by commas
 
+	targetJobIds := strings.Join(sc.JobIds, ",")
 	sc.targetJobIds = strings.Trim(targetJobIds, ",")
 }
