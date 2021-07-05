@@ -1,8 +1,0 @@
-- hosts: all
-  gather_facts: yes
-  become: yes
-  tasks:
-    - name: Copy file to tmp folder
-      copy:
-        src: "{{ ssh_key_file_path }}"
-        dest: /tmp/ssh_key

@@ -61,26 +61,17 @@ topology_template:
       requirements:
         - host: sodalite-vm
         - dependency: docker-host
-
- #   monitoring-system-hpc-exporter-ssh-key-config:
- #     type: sodalite.nodes.monitoring-system-hpc-exporter.config
- #       properties:
- #         ssh-key-file-path: { get_input: ssh-key-file-path }
  
     monitoring-system-hpc-exporter:
       type: sodalite.nodes.DockerizedComponent
       properties:
         image_name: sodaliteh2020/hpc-exporter:latest
         restart_policy: "no"
-        ports: [ '9100:9100' ]
-        exposed_ports: [ '9100' ]
+        ports: [ '9110:9110' ]
+        exposed_ports: [ '9110' ]
         docker_network_name:  { get_property: [ SELF, network, name ] }
-        env: { get_input: hpc-exporter-env }
-        volumes:
-          - "/tmp/ssh-key:/app/ssh_key"
         alias: hpc-exporter
       requirements:
         - host: sodalite-vm
         - network: docker-network
         - registry: docker-public-registry
-#        - dependency: monitoring-system-hpc-exporter-ssh-key-config
