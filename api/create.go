@@ -81,11 +81,21 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 
 	switch sched := config.Scheduler; sched {
 	case "pbs":
+		if _, exists := s.storePBS[config.Monitoring_id]; exists {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("There is already a PBS collector for the provided monitoring_id"))
+			return
+		}
 		s.storePBS[config.Monitoring_id] = pbs.NewerPBSCollector(config, userData.email)
 		prometheus.MustRegister(s.storePBS[config.Monitoring_id])
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))
 	case "slurm":
+		if _, exists := s.storePBS[config.Monitoring_id]; exists {
+			w.WriteHeader(http.StatusBadRequest)
+			w.Write([]byte("There is already a Slurm collector for the provided monitoring_id"))
+			return
+		}
 		s.storeSlurm[config.Monitoring_id] = slurm.NewerSlurmCollector(config, userData.email)
 		prometheus.MustRegister(s.storeSlurm[config.Monitoring_id])
 		w.WriteHeader(http.StatusOK)
