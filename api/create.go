@@ -14,6 +14,14 @@ import (
 
 func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
+	userData := NewUserData()
+	err := userData.GetEmail(r, *s.security)
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write([]byte(err.Error()))
+		return
+	}
+
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
@@ -39,31 +47,32 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	err = userData.GetSSHCredentials(config.Auth_method, r, *s.security)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+	}
+
+	config.User = userData.user
+
 	if config.Host == "localhost" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Localhost connection not available."))
+		return
 	} else if config.Host == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("HPC Host missing."))
+		return
 	} else {
-		if config.User == "" {
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("SSH user missing."))
-		}
 		switch authmethod := config.Auth_method; authmethod {
 		case "keypair":
-			if config.Private_key == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("SSH private key missing."))
-			}
+			config.Private_key = userData.private_key
 		case "password":
-			if config.Password == "" {
-				w.WriteHeader(http.StatusBadRequest)
-				w.Write([]byte("SSH password missing."))
-			}
+			config.Password = userData.password
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(fmt.Sprintf("The authentication method provided (%s) is not supported.", authmethod)))
+			return
 		}
 	}
 
@@ -72,12 +81,12 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 
 	switch sched := config.Scheduler; sched {
 	case "pbs":
-		s.storePBS[config.Monitoring_id] = pbs.NewerPBSCollector(config)
+		s.storePBS[config.Monitoring_id] = pbs.NewerPBSCollector(config, userData.email)
 		prometheus.MustRegister(s.storePBS[config.Monitoring_id])
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))
 	case "slurm":
-		s.storeSlurm[config.Monitoring_id] = slurm.NewerSlurmCollector(config)
+		s.storeSlurm[config.Monitoring_id] = slurm.NewerSlurmCollector(config, userData.email)
 		prometheus.MustRegister(s.storeSlurm[config.Monitoring_id])
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))

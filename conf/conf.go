@@ -15,6 +15,7 @@ type CollectorConfig struct {
 	Hpc_label        string
 	Only_jobs        bool
 	Job_id           string
+	Email            string
 }
 
 func DefaultConfig() *CollectorConfig {
@@ -32,5 +33,26 @@ func DefaultConfig() *CollectorConfig {
 		Hpc_label:        "no_label",
 		Only_jobs:        false,
 		Job_id:           "",
+		Email:            "",
+	}
+}
+
+type Security struct {
+	Introspection_endpoint string
+	Introspection_secret   string
+	Introspection_client   string
+	Vault_role             string
+	Vault_login_endpoint   string
+	Vault_storage_endpoint string
+}
+
+func NewSecurityConf() *Security {
+	return &Security{
+		Introspection_endpoint: "",
+		Introspection_secret:   "",
+		Introspection_client:   "",
+		Vault_role:             "",
+		Vault_login_endpoint:   "",
+		Vault_storage_endpoint: "",
 	}
 }

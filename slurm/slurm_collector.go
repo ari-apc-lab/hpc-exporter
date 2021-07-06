@@ -154,9 +154,10 @@ type SlurmCollector struct {
 	targetJobIds   string
 	JobIds         []string
 	skipInfra      bool
+	Email          string
 }
 
-func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
+func NewerSlurmCollector(config *conf.CollectorConfig, email string) *SlurmCollector {
 
 	constLabels := make(prometheus.Labels)
 	constLabels["deployment_label"] = config.Deployment_label
@@ -193,6 +194,7 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		mutex:          &sync.Mutex{},
 		JobIds:         []string{},
 		skipInfra:      config.Only_jobs,
+		Email:          email,
 	}
 
 	newerSlurmCollector.updateDynamicJobIds()
