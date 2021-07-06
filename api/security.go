@@ -41,6 +41,7 @@ func newKeycloakResponse() *KeycloakResponse {
 	}
 }
 
+// TODO Fix vault response according to real example
 type VaultResponse struct {
 	Password    string
 	User        string
@@ -97,6 +98,8 @@ func (d *UserData) GetEmail(r *http.Request, security_conf conf.Security) error 
 
 }
 
+// TODO Fix secret retrieval using real example
+
 func (d *UserData) GetSSHCredentials(method string, r *http.Request, security_conf conf.Security) error {
 	if d.jwt == "" {
 		d.getJWT(r)
@@ -142,6 +145,8 @@ func (d *UserData) GetSSHCredentials(method string, r *http.Request, security_co
 
 	return nil
 }
+
+// TODO Fix token retrieval using example
 
 func (d *UserData) getVaultToken(security_conf conf.Security) (string, error) {
 	client := &http.Client{}

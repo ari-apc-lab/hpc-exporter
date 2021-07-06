@@ -79,6 +79,8 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 	s.Lock()
 	defer s.Unlock()
 
+	// TODO Add support for multiple collectors of the same type and the same monitoring_id (different hpc_label)
+
 	switch sched := config.Scheduler; sched {
 	case "pbs":
 		if _, exists := s.storePBS[config.Monitoring_id]; exists {
