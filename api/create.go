@@ -76,6 +76,8 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
+	key := config.Monitoring_id + config.Host
+
 	s.Lock()
 	defer s.Unlock()
 
@@ -83,23 +85,23 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 
 	switch sched := config.Scheduler; sched {
 	case "pbs":
-		if _, exists := s.storePBS[config.Monitoring_id]; exists {
+		if _, exists := s.storePBS[key]; exists {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("There is already a PBS collector for the provided monitoring_id"))
+			w.Write([]byte("There is already a PBS collector for the provided monitoring_id and host"))
 			return
 		}
-		s.storePBS[config.Monitoring_id] = pbs.NewerPBSCollector(config, userData.email)
-		prometheus.MustRegister(s.storePBS[config.Monitoring_id])
+		s.storePBS[key] = pbs.NewerPBSCollector(config, userData.email)
+		prometheus.MustRegister(s.storePBS[key])
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))
 	case "slurm":
-		if _, exists := s.storePBS[config.Monitoring_id]; exists {
+		if _, exists := s.storePBS[key]; exists {
 			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte("There is already a Slurm collector for the provided monitoring_id"))
+			w.Write([]byte("There is already a Slurm collector for the provided monitoring_id and host"))
 			return
 		}
-		s.storeSlurm[config.Monitoring_id] = slurm.NewerSlurmCollector(config, userData.email)
-		prometheus.MustRegister(s.storeSlurm[config.Monitoring_id])
+		s.storeSlurm[key] = slurm.NewerSlurmCollector(config, userData.email)
+		prometheus.MustRegister(s.storeSlurm[key])
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))
 	default:

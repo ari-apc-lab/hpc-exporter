@@ -43,20 +43,30 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
-	} else if config.Monitoring_id == "no_label" {
+	}
+
+	if config.Monitoring_id == "no_label" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Need the monitoring_id"))
 		return
 	}
 
-	if collector, ok := s.storePBS[config.Monitoring_id]; ok {
+	if config.Host == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Need the Host"))
+		return
+	}
+
+	key := config.Monitoring_id + config.Host
+
+	if collector, ok := s.storePBS[key]; ok {
 		if collector.Email == userData.email {
 			prometheus.Unregister(collector)
 		} else {
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte("User not authorized to delete the provided monitoring_id"))
 		}
-	} else if collector, ok := s.storeSlurm[config.Monitoring_id]; ok {
+	} else if collector, ok := s.storeSlurm[key]; ok {
 		if collector.Email == userData.email {
 			prometheus.Unregister(collector)
 		} else {
