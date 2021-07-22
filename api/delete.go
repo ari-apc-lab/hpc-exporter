@@ -13,7 +13,7 @@ import (
 func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
 	userData := NewUserData()
-	err := userData.GetEmail(r, *s.security)
+	err := userData.GetUser(r, *s.security)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(err.Error()))

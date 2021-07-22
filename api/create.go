@@ -15,7 +15,7 @@ import (
 func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	userData := NewUserData()
-	err := userData.GetEmail(r, *s.security)
+	err := userData.GetUser(r, *s.security)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		w.Write([]byte(err.Error()))
@@ -37,7 +37,6 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Define default values
 	config := conf.DefaultConfig()
 
 	err = json.Unmarshal(bodyBytes, &config)
@@ -47,13 +46,13 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = userData.GetSSHCredentials(config.Auth_method, r, *s.security)
+	err = userData.GetSSHCredentials(config.Auth_method, config.Hpc_label, r, *s.security)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 	}
 
-	config.User = userData.user
+	config.User = userData.ssh_user
 
 	if config.Host == "localhost" {
 		w.WriteHeader(http.StatusBadRequest)
@@ -66,9 +65,9 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 	} else {
 		switch authmethod := config.Auth_method; authmethod {
 		case "keypair":
-			config.Private_key = userData.private_key
+			config.Private_key = userData.ssh_private_key
 		case "password":
-			config.Password = userData.password
+			config.Password = userData.ssh_password
 		default:
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte(fmt.Sprintf("The authentication method provided (%s) is not supported.", authmethod)))

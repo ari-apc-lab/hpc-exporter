@@ -11,20 +11,22 @@ import (
 )
 
 type UserData struct {
-	email       string
-	jwt         string
-	private_key string
-	password    string
-	user        string
+	username        string
+	email           string
+	jwt             string
+	ssh_private_key string
+	ssh_password    string
+	ssh_user        string
 }
 
 func NewUserData() *UserData {
 	return &UserData{
-		email:       "",
-		jwt:         "",
-		private_key: "",
-		password:    "",
-		user:        "",
+		username:        "",
+		email:           "",
+		jwt:             "",
+		ssh_private_key: "",
+		ssh_password:    "",
+		ssh_user:        "",
 	}
 }
 
@@ -34,7 +36,7 @@ func (d *UserData) getJWT(r *http.Request) {
 	d.jwt = strings.TrimSpace(splitToken[1])
 }
 
-func (d *UserData) GetEmail(r *http.Request, security_conf conf.Security) error {
+func (d *UserData) GetUser(r *http.Request, security_conf conf.Security) error {
 	if d.jwt == "" {
 		d.getJWT(r)
 	}
@@ -70,7 +72,7 @@ func (d *UserData) GetEmail(r *http.Request, security_conf conf.Security) error 
 
 }
 
-func (d *UserData) GetSSHCredentials(method string, r *http.Request, security_conf conf.Security) error {
+func (d *UserData) GetSSHCredentials(method, hpc string, r *http.Request, security_conf conf.Security) error {
 	if d.jwt == "" {
 		d.getJWT(r)
 	}
@@ -81,7 +83,9 @@ func (d *UserData) GetSSHCredentials(method string, r *http.Request, security_co
 	}
 
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", security_conf.Vault_storage_endpoint, nil)
+
+	secret_endpoint := "http://" + security_conf.Vault_address + "/v1/hpc/" + d.username + "/" + hpc
+	req, err := http.NewRequest("GET", secret_endpoint, nil)
 	if err != nil {
 		return err
 	}
@@ -96,19 +100,19 @@ func (d *UserData) GetSSHCredentials(method string, r *http.Request, security_co
 		return errors.New("error when retrieving the Vault secrets")
 	}
 	vault_secret := vault_response.Data
-	d.user = vault_secret.User
-	if d.user == "" {
+	d.ssh_user = vault_secret.User
+	if d.ssh_user == "" {
 		return errors.New("no user stored in Vault")
 	}
 	switch method {
 	case "password":
-		d.password = vault_secret.Password
-		if d.password == "" {
+		d.ssh_password = vault_secret.Password
+		if d.ssh_password == "" {
 			return errors.New("no password stored in Vault")
 		}
 	case "keypair":
-		d.private_key = vault_secret.Private_key
-		if d.private_key == "" {
+		d.ssh_private_key = vault_secret.Private_key
+		if d.ssh_private_key == "" {
 			return errors.New("no private key stored in Vault")
 		}
 	}
@@ -121,9 +125,10 @@ func (d *UserData) getVaultToken(security_conf conf.Security) (string, error) {
 	data := url.Values{}
 
 	data.Set("jwt", d.jwt)
-	data.Set("role", security_conf.Vault_role)
+	data.Set("role", d.username)
 
-	req, err := http.NewRequest("POST", security_conf.Vault_login_endpoint, strings.NewReader(data.Encode()))
+	vault_login_endpoint := "http://" + security_conf.Vault_address + "/auth/jwt/login"
+	req, err := http.NewRequest("POST", vault_login_endpoint, strings.NewReader(data.Encode()))
 	if err != nil {
 		return "", errors.New("could not create Vault login request")
 	}
@@ -138,7 +143,7 @@ func (d *UserData) getVaultToken(security_conf conf.Security) (string, error) {
 
 	vault_response := newVaultLoginResponse()
 	if err := json.NewDecoder(resp_login.Body).Decode(vault_response); err != nil {
-		return "", errors.New("error when retrieving the Vault secrets")
+		return "", errors.New("error when retrieving the Vault token")
 	}
 
 	return vault_response.Auth.Client_token, nil

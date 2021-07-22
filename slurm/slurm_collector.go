@@ -162,7 +162,7 @@ func NewerSlurmCollector(config *conf.CollectorConfig, email string) *SlurmColle
 	constLabels := make(prometheus.Labels)
 	constLabels["deployment_label"] = config.Deployment_label
 	constLabels["hpc"] = config.Hpc_label
-	constLabels["deployment_id"] = config.Monitoring_id
+	constLabels["monitoring_id"] = config.Monitoring_id
 
 	var metrics = map[string]PromMetricDesc{
 		"JobState":      {"slurm_job_state", "job current state", jobtags, constLabels, true},

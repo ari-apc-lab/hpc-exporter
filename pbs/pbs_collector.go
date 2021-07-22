@@ -94,7 +94,7 @@ func NewerPBSCollector(config *conf.CollectorConfig, email string) *PBSCollector
 	constLabels := make(prometheus.Labels)
 	constLabels["deployment_label"] = config.Deployment_label
 	constLabels["hpc"] = config.Hpc_label
-	constLabels["deployment_id"] = config.Monitoring_id
+	constLabels["monitoring_id"] = config.Monitoring_id
 
 	var metrics = map[string]PromMetricDesc{
 		"JobState":        {"pbs_job_state", "job current state", jobtags, constLabels, true},
@@ -106,7 +106,7 @@ func NewerPBSCollector(config *conf.CollectorConfig, email string) *PBSCollector
 		"JobNCPUs":        {"pbs_job_cpu_n", "job number of threads requested by the job", jobtags, constLabels, true},
 		"JobVMEM":         {"pbs_job_mem_virtual", "job virtual memory used", jobtags, constLabels, true},
 		"JobQueued":       {"pbs_job_time_queued", "job time spent between creation and running start (or now)", jobtags, constLabels, true},
-		"JobRSS":          {"pbs_job_memory_physical", "job physical memory used", jobtags, constLabels, true},
+		"JobRSS":          {"pbs_job_mem_physical", "job physical memory used", jobtags, constLabels, true},
 		"JobExitStatus":   {"pbs_job_exit_status", "job exit status. -1 if not completed", jobtags, constLabels, true},
 		"QueueTotal":      {"pbs_queue_jobs_total", "queue total number of jobs assigned", queuetags, constLabels, false},
 		"QueueMax":        {"pbs_queue_jobs_max", "queue max number of jobs", queuetags, constLabels, false},

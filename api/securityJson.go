@@ -1,14 +1,16 @@
 package api
 
 type KeycloakResponse struct {
-	Email  string `json:"email"`
-	Active bool   `json:"active"`
+	Email    string `json:"email"`
+	Active   bool   `json:"active"`
+	Username string `json:"preferred_username"`
 }
 
 func newKeycloakResponse() *KeycloakResponse {
 	return &KeycloakResponse{
-		Email:  "",
-		Active: false,
+		Email:    "",
+		Active:   false,
+		Username: "",
 	}
 }
 

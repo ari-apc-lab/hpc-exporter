@@ -44,22 +44,10 @@ var (
 		"Introspection client secret.",
 	)
 
-	vault_login_endpoint = flag.String(
-		"vault-login-endpoint",
+	vault_address = flag.String(
+		"vault-address",
 		"",
 		"Vault login endpoint.",
-	)
-
-	vault_storage_endpoint = flag.String(
-		"vault-storage-endpoint",
-		"",
-		"Vault secret endpoint.",
-	)
-
-	vault_role = flag.String(
-		"vault-role",
-		"",
-		"Vault role.",
 	)
 )
 
@@ -103,31 +91,13 @@ func main() {
 		security_config.Introspection_secret = *introspection_secret
 	}
 
-	if *vault_login_endpoint == "" {
-		security_config.Vault_login_endpoint = os.Getenv("VAULT_LOGIN_ENDPOINT")
-		if security_config.Vault_login_endpoint == "" {
-			log.Fatal("No introspection secret given. Provide argument --vault-login-endpoint or set environment variable VAULT_LOGIN_ENDPOINT")
+	if *vault_address == "" {
+		security_config.Vault_address = os.Getenv("VAULT_ADDRESS")
+		if security_config.Vault_address == "" {
+			log.Fatal("No introspection secret given. Provide argument --vault-login-endpoint or set environment variable VAULT_ADDRESS")
 		}
 	} else {
-		security_config.Vault_login_endpoint = *vault_login_endpoint
-	}
-
-	if *vault_role == "" {
-		security_config.Vault_role = os.Getenv("VAULT_ROLE")
-		if security_config.Vault_role == "" {
-			log.Fatal("No introspection secret given. Provide argument --vault-role or set environment variable VAULT_ROLE")
-		}
-	} else {
-		security_config.Vault_role = *vault_role
-	}
-
-	if *vault_storage_endpoint == "" {
-		security_config.Vault_storage_endpoint = os.Getenv("VAULT_STORAGE_ENDPOINT")
-		if security_config.Vault_storage_endpoint == "" {
-			log.Fatal("No introspection secret given. Provide argument --vault-storage-endpoint or set environment variable VAULT_STORAGE_ENDPOINT")
-		}
-	} else {
-		security_config.Vault_storage_endpoint = *introspection_secret
+		security_config.Vault_address = *vault_address
 	}
 
 	collectorStore := api.NewCollectorStore(security_config)
@@ -141,7 +111,7 @@ func main() {
 		w.Write([]byte(`<html>
 			<head><title>Multi-Tenant HPC Exporter</title></head>
 			<body>
-			<h1>Node Exporter</h1>
+			<h1>HPC Exporter</h1>
 			<p><a href="/metrics">Metrics</a></p>
 			</body>
 			</html>`))
