@@ -254,9 +254,10 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Infof("Collecting metrics from Slurm...")
 		sc.trackedJobs = make(map[string]bool)
 		if sc.targetJobIds == "" {
-			sc.collectQueue()
+			// sc.collectQueue()
+		} else {
+			sc.collectAcct()
 		}
-		sc.collectAcct()
 		if !sc.skipInfra {
 			sc.collectInfo()
 		}

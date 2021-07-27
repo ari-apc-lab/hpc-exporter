@@ -1,20 +1,20 @@
 package conf
 
 type CollectorConfig struct {
-	Host             string
-	Scheduler        string
+	Host             string `json:"host"`
+	Scheduler        string `json:"scheduler"`
 	User             string
-	Auth_method      string
+	Auth_method      string `json:"auth_method"`
 	Password         string
 	Private_key      string
 	Private_key_pw   string
-	Sacct_history    int
-	Scrape_interval  int
-	Deployment_label string
-	Monitoring_id    string
-	Hpc_label        string
-	Only_jobs        bool
-	Job_id           string
+	Sacct_history    int    `json:"sacct_history"`
+	Scrape_interval  int    `json:"scrape_interval"`
+	Deployment_label string `json:"deployment_label"`
+	Monitoring_id    string `json:"monitoring_id"`
+	Hpc_label        string `json:"hpc_label"`
+	Only_jobs        bool   `json:"only_jobs"`
+	Job_id           string `json:"job_id"`
 }
 
 func DefaultConfig() *CollectorConfig {

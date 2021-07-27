@@ -11,6 +11,8 @@ import (
 
 	"hpc_exporter/api"
 	"hpc_exporter/conf"
+
+	"github.com/gorilla/mux"
 )
 
 var (
@@ -34,7 +36,7 @@ var (
 
 	introspection_client = flag.String(
 		"introspection-client",
-		"",
+		"sodalite-ide",
 		"Introspection client.",
 	)
 
@@ -103,11 +105,13 @@ func main() {
 	collectorStore := api.NewCollectorStore(security_config)
 	// Expose the registered metrics via HTTP.
 	log.Infof("Starting Server: %s", *addr)
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/create", collectorStore.CreateHandler)
-	http.HandleFunc("/delete", collectorStore.DeleteHandler)
-	http.HandleFunc("/addjob", collectorStore.AddJobHandler)
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+
+	router := mux.NewRouter()
+	router.Handle("/metrics", promhttp.Handler())
+	router.HandleFunc("/collector", collectorStore.CreateHandler).Methods("POST")
+	router.HandleFunc("/collector", collectorStore.DeleteHandler).Methods("DELETE")
+	router.HandleFunc("/job", collectorStore.AddJobHandler).Methods("POST")
+	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html>
 			<head><title>Multi-Tenant HPC Exporter</title></head>
 			<body>
@@ -115,6 +119,6 @@ func main() {
 			<p><a href="/metrics">Metrics</a></p>
 			</body>
 			</html>`))
-	})
-	log.Fatal(http.ListenAndServe(*addr, nil))
+	}).Methods("GET")
+	log.Debug(http.ListenAndServe(*addr, router))
 }

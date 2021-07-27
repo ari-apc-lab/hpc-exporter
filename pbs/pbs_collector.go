@@ -193,12 +193,13 @@ func (pc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 		defer pc.sshClient.Close()
 		log.Infof("Collecting metrics from PBS...")
 		pc.trackedJobs = make(map[string]bool)
-		pc.collectJobs(ch)
+		if pc.targetJobIds != "" {
+			pc.collectJobs(ch)
+		}
 		if !pc.skipInfra {
 			pc.collectQueues(ch)
 		}
 		pc.lastScrape = time.Now()
-		pc.delJobs()
 	}
 	pc.updateMetrics(ch)
 }
@@ -345,20 +346,6 @@ func (pc *PBSCollector) updateMetrics(ch chan<- prometheus.Metric) {
 		}
 	}
 
-}
-
-func (sc *PBSCollector) delJobs() {
-	log.Debugf("Cleaning old jobs")
-	i := 0
-	for job, tracked := range sc.trackedJobs {
-		if !tracked {
-			for _, elems := range sc.jMetrics {
-				delete(elems, job)
-				i++
-			}
-		}
-	}
-	log.Debugf("%d old jobs deleted", i)
 }
 
 func parseMem(s string) (float64, error) {

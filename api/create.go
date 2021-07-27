@@ -6,26 +6,16 @@ import (
 	"hpc_exporter/conf"
 	"hpc_exporter/pbs"
 	"hpc_exporter/slurm"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
 )
 
 func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request) {
-
 	userData := NewUserData()
 	err := userData.GetUser(r, *s.security)
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
-	bodyBytes, err := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
@@ -38,8 +28,8 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	config := conf.DefaultConfig()
-
-	err = json.Unmarshal(bodyBytes, &config)
+	decoder := json.NewDecoder(r.Body)
+	err = decoder.Decode(&config)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))

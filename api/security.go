@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"hpc_exporter/conf"
@@ -30,15 +31,21 @@ func NewUserData() *UserData {
 	}
 }
 
-func (d *UserData) getJWT(r *http.Request) {
+func (d *UserData) getJWT(r *http.Request) error {
 	reqToken := r.Header.Get("Authorization")
 	splitToken := strings.Split(reqToken, "Bearer")
+	if len(splitToken) != 2 {
+		return errors.New("incorrect authorization header format")
+	}
 	d.jwt = strings.TrimSpace(splitToken[1])
+	return nil
 }
 
 func (d *UserData) GetUser(r *http.Request, security_conf conf.Security) error {
 	if d.jwt == "" {
-		d.getJWT(r)
+		if err := d.getJWT(r); err != nil {
+			return err
+		}
 	}
 	client := &http.Client{}
 
@@ -68,6 +75,7 @@ func (d *UserData) GetUser(r *http.Request, security_conf conf.Security) error {
 		return errors.New("Unauthorized")
 	}
 	d.email = keycloak_response.Email
+	d.username = keycloak_response.Username
 	return nil
 
 }
@@ -122,18 +130,16 @@ func (d *UserData) GetSSHCredentials(method, hpc string, r *http.Request, securi
 
 func (d *UserData) getVaultToken(security_conf conf.Security) (string, error) {
 	client := &http.Client{}
-	data := url.Values{}
 
-	data.Set("jwt", d.jwt)
-	data.Set("role", d.username)
+	s := vaultLogin(d.jwt, d.username)
+	b := new(bytes.Buffer)
+	json.NewEncoder(b).Encode(s)
 
-	vault_login_endpoint := "http://" + security_conf.Vault_address + "/auth/jwt/login"
-	req, err := http.NewRequest("POST", vault_login_endpoint, strings.NewReader(data.Encode()))
+	vault_login_endpoint := "http://" + security_conf.Vault_address + "/v1/auth/jwt/login"
+	req, err := http.NewRequest("POST", vault_login_endpoint, b)
 	if err != nil {
 		return "", errors.New("could not create Vault login request")
 	}
-
-	req.Header.Add("Content-Length", strconv.Itoa(len(data.Encode())))
 
 	resp_login, err := client.Do(req)
 	if err != nil {

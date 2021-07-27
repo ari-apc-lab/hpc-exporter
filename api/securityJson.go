@@ -49,3 +49,15 @@ func newVaultSecretResponse() *VaultSecretResponse {
 		},
 	}
 }
+
+type VaultLoginRequest struct {
+	Jwt  string `json:"jwt"`
+	Role string `json:"role"`
+}
+
+func vaultLogin(jwt, role string) *VaultLoginRequest {
+	return &VaultLoginRequest{
+		Jwt:  jwt,
+		Role: role,
+	}
+}

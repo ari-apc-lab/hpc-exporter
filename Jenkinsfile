@@ -41,7 +41,7 @@ pipeline {
                 """
             }
         }
-        stage('Build HPC-exporter') {
+        stage('Build Multi-Tenant HPC-exporter') {
             when {
                 allOf {
                     // Triggered on every tag, that is considered for staging or production
@@ -52,10 +52,10 @@ pipeline {
                 }
              }
             steps {
-                sh "cd docker && ./make_docker.sh build hpc-exporter"
+                sh "cd docker && ./make_docker.sh build hpc-exporter-mt"
             }
         }
-        stage('Push HPC-exporter to sodalite-private-registry') {
+        stage('Push Multi-Tenant HPC-exporter to sodalite-private-registry') {
             // Push during staging and production
             when {
                 allOf {
@@ -68,12 +68,12 @@ pipeline {
             steps {
                 withDockerRegistry(credentialsId: 'jenkins-sodalite.docker_token', url: '') {
                     sh  """#!/bin/bash
-                        ./docker/make_docker.sh push hpc-exporter staging
+                        ./docker/make_docker.sh push hpc-exporter-mt staging
                         """
                 }
             }
         }
-        stage('Push HPC-exporter to DockerHub') {
+        stage('Push Multi-Tenant HPC-exporter to DockerHub') {
             when {
                 allOf {
                     // Triggered on every tag, that is considered for staging or production
@@ -85,7 +85,7 @@ pipeline {
              }
             steps {
                 withDockerRegistry(credentialsId: 'jenkins-sodalite.docker_token', url: '') {
-                    sh "./docker/make_docker.sh push hpc-exporter production"
+                    sh "./docker/make_docker.sh push hpc-exporter-mt production"
                 }
             }
         }

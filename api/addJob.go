@@ -11,12 +11,12 @@ import (
 func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request) {
 
 	bodyBytes, err := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
 		return
 	}
+	defer r.Body.Close()
 
 	ct := r.Header.Get("content-type")
 	if ct != "application/json" {
@@ -45,16 +45,24 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	if config.Host == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("Need the HPC Host"))
+		return
+	}
+
 	s.Lock()
 	defer s.Unlock()
 
-	if collector, ok := s.storePBS[config.Monitoring_id]; ok {
+	key := config.Monitoring_id + config.Host
+
+	if collector, ok := s.storePBS[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
-	} else if collector, ok := s.storeSlurm[config.Monitoring_id]; ok {
+	} else if collector, ok := s.storeSlurm[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Monitoring_id not found"))
+		w.Write([]byte("Combination of Host and Monitoring_id not found"))
 		return
 	}
 
