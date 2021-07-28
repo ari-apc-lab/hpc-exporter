@@ -36,7 +36,7 @@ var (
 
 	introspection_client = flag.String(
 		"introspection-client",
-		"sodalite-ide",
+		"",
 		"Introspection client.",
 	)
 
@@ -68,7 +68,7 @@ func main() {
 
 	if *introspection_endpoint == "" {
 		security_config.Introspection_endpoint = os.Getenv("OIDC_INTROSPECTION_ENDPOINT")
-		if security_config.Introspection_endpoint == "" {
+		if len(security_config.Introspection_endpoint) == 0 {
 			log.Fatal("No introspection endpoint given. Provide argument --introspection-endpoint or set environment variable OIDC_INTROSPECTION_ENDPOINT")
 		}
 	} else {
@@ -77,8 +77,8 @@ func main() {
 
 	if *introspection_client == "" {
 		security_config.Introspection_client = os.Getenv("OIDC_INTROSPECTION_CLIENT")
-		if security_config.Introspection_client == "" {
-			log.Fatal("No introspection client given. Provide argument --introspection-client or set environment variable OIDC_INTROSPECTION_CLIENT")
+		if len(security_config.Introspection_client) == 0 {
+			security_config.Introspection_client = "sodalite-ide"
 		}
 	} else {
 		security_config.Introspection_client = *introspection_client
@@ -86,7 +86,7 @@ func main() {
 
 	if *introspection_secret == "" {
 		security_config.Introspection_secret = os.Getenv("OIDC_INTROSPECTION_SECRET")
-		if security_config.Introspection_secret == "" {
+		if len(security_config.Introspection_secret) == 0 {
 			log.Fatal("No introspection secret given. Provide argument --introspection-secret or set environment variable OIDC_INTROSPECTION_SECRET")
 		}
 	} else {
@@ -95,7 +95,7 @@ func main() {
 
 	if *vault_address == "" {
 		security_config.Vault_address = os.Getenv("VAULT_ADDRESS")
-		if security_config.Vault_address == "" {
+		if len(security_config.Vault_address) == 0 {
 			log.Fatal("No introspection secret given. Provide argument --vault-login-endpoint or set environment variable VAULT_ADDRESS")
 		}
 	} else {
