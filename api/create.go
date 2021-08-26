@@ -36,14 +36,6 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	err = userData.GetSSHCredentials(config.Auth_method, config.Hpc_label, r, *s.security)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
-	}
-
-	config.User = userData.ssh_user
-
 	if config.Host == "localhost" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Localhost connection not available."))
@@ -53,6 +45,13 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		w.Write([]byte("HPC Host missing."))
 		return
 	} else {
+		err = userData.GetSSHCredentials(config.Auth_method, config.Host, r, *s.security)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(err.Error()))
+		}
+
+		config.User = userData.ssh_user
 		switch authmethod := config.Auth_method; authmethod {
 		case "keypair":
 			config.Private_key = userData.ssh_private_key
