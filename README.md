@@ -1,6 +1,43 @@
 # hpc-exporter
 
-This prometheus exporter connects via ssh to the frontend of a given HPC infrastructure and queries the scheduler in order to collect and expose the metrics of all the jobs the user can see. It also gathers and exposes data on the HPC partitions/queues.
+This prometheus exporter hosts different collectors, identified by a pair of labels: monitoring-id and hpc label. Each collector connects via ssh to the frontend of a given HPC infrastructure and queries the scheduler in order to collect and expose the metrics of all the jobs the collector in question must monitor (through job_ids passed to it). It also gathers and exposes data on the HPC partitions/queues. Each collector labels all their metrics with the labels `monitoring_id`and `hpc`. 
+
+The ssh credentials for the hpc are retrieved from Vault, using the user's JWT to authenticate.
+
+The exporter offers an API with the following endpoints:
+
+- `/collector [POST]`: Creates a collector. Authorization header must contain a valid JWT. Payload is a JSON object containing the configuration for the collector:
+  ```
+  {
+    "host": <HPC frontend URL>,
+	"scheduler": <"slurm" or "pbs">,
+	"auth_method": <"keypair" or "password">,
+	"sacct_history": <Days back to query for metrics, only for slurm>,
+	"scrape_interval": <Maximum query interval, in seconds>,
+	"deployment_label": <Human-readable label to identify a deployment, will be included in all the metrics as a label>,
+	"monitoring_id": <Unique identifier for the deployment, will be included in all the metrics as a label>,
+	"hpc_label": <Human-readable to identify the HPC this collector is connected to, , will be included in all the metrics as a label>,
+	"only_jobs": <Boolean. If True, infrastructure metrics will not be collected>,
+  }
+  ```
+
+- `/collector [DELETE]`: Deletes a collector. Authorization header must also contain a valid JWT. Only the user that created the collector can delete it. Payload is a JSON object containing information to identify the collector:
+  ```
+  {
+    "host": <HPC frontend URL>,
+	"monitoring_id": <Unique identifier for the deployment>,
+  }
+  ```
+
+- `/job [POST]`: Adds a jobid to the list of jobs a collector monitors. Payload is a JSON object containing information to identify the collector, as well as the jobid itself:
+  ```
+  {
+    "host": <HPC frontend URL>,
+	"monitoring_id": <Unique identifier for the deployment>,
+    "job_id": <Job ID to add tot he collector>
+  }
+  ```
+
 
 ## Metrics collected for supported schedulers
 ### **PBS Professional**
@@ -61,29 +98,23 @@ go build
 ```
 3. Run the exporter
 ```
-hpc_exporter -host <HOST> -listen-address <PORT> -scheduler <SCHED> [-sacct-history <HISTORY>] -ssh-user <USER> -ssh-auth-method <AUTH> [-ssh-password <PASS> | -ssh-known-hosts <PATH> [-ssh-priv-key-file <PATH> | -ssh-priv-key <KEY>]]  -log-level=<LOGLEVEL> -scrape-interval <INTERVAL> -job-ids <JOBID LIST>
+hpc_exporter -listen-address <PORT> -log-level <LOGLEVEL> -introspection-endpoint <OIDC_INTROSPECTION_ENDPOINT> -introspection-client <OIDC_INTROSPECTION_CLIENT> -introspection_secret <OIDC_INTROSPECTION_SECRET> -vault-address <VAULT_ADDRESS>
 ```
-- `<HOST>`: HPC frontend address. `localhost` as default, not supported.
 - `<PORT>`: Port the metrics will be exposed on for prometheus. `:9110` as default.   
-- `<SCHED>`: Scheduler used in the HPC. `pbs` as default, installed in sodalite-fe.hlrs.de
-- `<HISTORY>`: If the scheduler is Slurm, the jobs that will be reported will be the ones that have been submitted in the last `<HISTORY>` days. Default 5.
-- `<USER>`: SSH user to connect to the `<HOST>` frontend
-- `<AUTH>`: SSH authentication method used on the HPC frontend. See **Authentication methods** below for details
 - `<LOGLEVEL>`: Logging level. `error` as default, `warn`, `info` and `debug` also supported
-- `<INTERVAL>`: Minimum amount of time in seconds between each query to the HPC frontend. Default 300.
-- `<JOBID LIST>`: List of Job IDs to monitor. Separated by commas. If not set, all jobs by the user will be monitored.
+- `<OIDC_INTROSPECTION_ENDPOINT>`: Endpoint of the service to verify JWTs. Default is env variable  `OIDC_INTROSPECTION_ENDPOINT`
+- `<OIDC_INTROSPECTION_CLIENT>`: Client of the service to verify JWTs. Default is env variable  `OIDC_INTROSPECTION_CLIENT`
+- `<OIDC_INTROSPECTION_SECRET>`: Client secret of the service to verify JWTs. Default is env variable  `OIDC_INTROSPECTION_SECRET`
+- `<VAULT_ADDRESS>`: Address of the Vault instance that holds the ssh credentials. Default is env variable `VAULT_ADDRESS`
+
 
 ### Dockerization
-Check the [README.md](docker/README.md) file in [`docker`](docker) folder for instructions about Docker deployment of HPC exporters
+Check the [README.md](docker/README.md) file in [`docker`](docker) folder for instructions about Docker deployment of HPC exporter
 
 ### Authentication methods
-Authentication methods supported are:
-- `password`: Password SSH authentication. 
-    Expects the password to be set with `-ssh-password <PASS>`.
-- `keypair-file`: Public-private SSH authentication. 
-    Expects the paths to known hosts (`-ssh-known-hosts <PATH>`) and private key (`-ssh-priv-key-file <PATH>`) files of the user.
-- `keypair`: Public-private SSH authentication. 
-    Expects the path to known hosts (`-ssh-known-hosts <PATH>`) and the private key (`-ssh-priv-key <KEY>`) of the user in plain text (not stored in a file), including header and footer such as `-----BEGIN RSA PRIVATE KEY-----\n` and `\n-----BEGIN RSA PRIVATE KEY-----`.
+There are 2 authentication methods supported. Both require that the credentials are saved in the Vault instance the exporter is configured to access. The credentials must be stored in a secret in `/hpc/<username>/<hpc-address>`
+- `password`: Password authentication. Expects the password to be in the secret with the key `password`.
+- `keypair`: Public-private key authentication. Expects the private key to be stored in the vault secret with the key `pkey` in plain text. The content of the value must include header and footer such as `-----BEGIN RSA PRIVATE KEY-----\n` and `\n-----BEGIN RSA PRIVATE KEY-----`. There must be no line breaks (`/n`) inside the key itself.
 
 ## State codes
 

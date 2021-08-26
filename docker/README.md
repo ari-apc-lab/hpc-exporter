@@ -4,11 +4,11 @@ A docker image can be found [here](https://hub.docker.com/r/sodaliteh2020/hpc-ex
 
 ## Usage
 
-You can can check the following files for an example of usage with the xopera orchestrator.
- 
-* `Dockerfile` with image definition
-* xOpera input file:
-  * `input.yaml`: Example of how the parameters must be passed to run the exporter in a container    
-* xOpera service files:
-  * `service.yaml.local`: Image must be built and pushed to a local registry 
-  * `service.yaml.privateregistry`: Image is pulled from the private Sodalite registry
+Recommended usage is to use environment variables to launch the image. Internal port is 9110 by default, it must  be mapped to whatever port is needed by the user. Environment variables:
+
+- `<OIDC_INTROSPECTION_ENDPOINT>`: Endpoint of the service to verify JWTs. Default is env variable  `OIDC_INTROSPECTION_ENDPOINT`
+- `<OIDC_INTROSPECTION_CLIENT>`: Client of the service to verify JWTs. Default is env variable  `OIDC_INTROSPECTION_CLIENT`
+- `<OIDC_INTROSPECTION_SECRET>`: Client secret of the service to verify JWTs. Default is env variable  `OIDC_INTROSPECTION_SECRET`
+- `<VAULT_ADDRESS>`: Address of the Vault instance that holds the ssh credentials. Default is env variable `VAULT_ADDRESS`
+
+
