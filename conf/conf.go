@@ -34,19 +34,3 @@ func DefaultConfig() *CollectorConfig {
 		Job_id:           "",
 	}
 }
-
-type Security struct {
-	Introspection_endpoint string
-	Introspection_secret   string
-	Introspection_client   string
-	Vault_address          string
-}
-
-func NewSecurityConf() *Security {
-	return &Security{
-		Introspection_endpoint: "",
-		Introspection_secret:   "",
-		Introspection_client:   "",
-		Vault_address:          "",
-	}
-}
