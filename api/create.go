@@ -12,13 +12,6 @@ import (
 )
 
 func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request) {
-	userData := NewUserData()
-	err := userData.GetUser(r, *s.security)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(err.Error()))
-		return
-	}
 
 	ct := r.Header.Get("content-type")
 	if ct != "application/json" {
@@ -29,7 +22,7 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 
 	config := conf.DefaultConfig()
 	decoder := json.NewDecoder(r.Body)
-	err = decoder.Decode(&config)
+	err := decoder.Decode(&config)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
@@ -42,25 +35,19 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		return
 	} else if config.Host == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("HPC Host missing."))
+		w.Write([]byte("HPC Host missing. (\"host\")"))
 		return
+	} else if config.User == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("SSH user missing. (\"user\")"))
 	} else {
-		err = userData.GetSSHCredentials(config.Auth_method, config.Host, r, *s.security)
-		if err != nil {
+		if config.Password != "" && config.Auth_method != "keypair" {
+			config.Auth_method = "password"
+		} else if config.Private_key != "" {
+			config.Auth_method = "keypair"
+		} else {
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(err.Error()))
-		}
-
-		config.User = userData.ssh_user
-		switch authmethod := config.Auth_method; authmethod {
-		case "keypair":
-			config.Private_key = userData.ssh_private_key
-		case "password":
-			config.Password = userData.ssh_password
-		default:
-			w.WriteHeader(http.StatusBadRequest)
-			w.Write([]byte(fmt.Sprintf("The authentication method provided (%s) is not supported.", authmethod)))
-			return
+			w.Write([]byte("No password or private key provided"))
 		}
 	}
 
@@ -78,7 +65,7 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 			w.Write([]byte("There is already a PBS collector for the provided monitoring_id and host"))
 			return
 		}
-		s.storePBS[key] = pbs.NewerPBSCollector(config, userData.email)
+		s.storePBS[key] = pbs.NewerPBSCollector(config)
 		prometheus.MustRegister(s.storePBS[key])
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))
@@ -88,7 +75,7 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 			w.Write([]byte("There is already a Slurm collector for the provided monitoring_id and host"))
 			return
 		}
-		s.storeSlurm[key] = slurm.NewerSlurmCollector(config, userData.email)
+		s.storeSlurm[key] = slurm.NewerSlurmCollector(config)
 		prometheus.MustRegister(s.storeSlurm[key])
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))

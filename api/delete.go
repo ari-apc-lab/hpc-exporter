@@ -12,14 +12,6 @@ import (
 
 func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 
-	userData := NewUserData()
-	err := userData.GetUser(r, *s.security)
-	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		w.Write([]byte(err.Error()))
-		return
-	}
-
 	bodyBytes, err := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
@@ -60,19 +52,9 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 	key := config.Monitoring_id + config.Host
 
 	if collector, ok := s.storePBS[key]; ok {
-		if collector.Email == userData.email {
-			prometheus.Unregister(collector)
-		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("User not authorized to delete the provided monitoring_id"))
-		}
+		prometheus.Unregister(collector)
 	} else if collector, ok := s.storeSlurm[key]; ok {
-		if collector.Email == userData.email {
-			prometheus.Unregister(collector)
-		} else {
-			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte("User not authorized to delete the provided monitoring_id"))
-		}
+		prometheus.Unregister(collector)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("monitoring_id not found"))

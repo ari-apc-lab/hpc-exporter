@@ -86,10 +86,9 @@ type PBSCollector struct {
 	targetJobIds   string
 	JobIds         []string
 	skipInfra      bool
-	Email          string
 }
 
-func NewerPBSCollector(config *conf.CollectorConfig, email string) *PBSCollector {
+func NewerPBSCollector(config *conf.CollectorConfig) *PBSCollector {
 
 	constLabels := make(prometheus.Labels)
 	constLabels["deployment_label"] = config.Deployment_label
@@ -134,7 +133,6 @@ func NewerPBSCollector(config *conf.CollectorConfig, email string) *PBSCollector
 		mutex:          &sync.Mutex{},
 		JobIds:         []string{},
 		skipInfra:      config.Only_jobs,
-		Email:          email,
 	}
 
 	newerPBSCollector.updateDynamicJobIds()
