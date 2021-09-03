@@ -9,7 +9,7 @@ WORKDIR /app
 RUN apk add --update --no-cache git
 
 # Get HPC exporter
-RUN git clone -b multi-tenant https://github.com/SODALITE-EU/hpc-exporter.git
+RUN git clone -b nojwt https://github.com/ari-apc-lab/hpc-exporter.git
 # Build the code
 RUN cd hpc-exporter && go build
 

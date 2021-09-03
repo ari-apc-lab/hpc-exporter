@@ -3,9 +3,5 @@ docker-network: sodalite
 docker-public-registry-url: registry.hub.docker.com
 ssh-key-file-path: /home/ubuntu/.ssh/hlrs
 hpc-exporter-env:
-  HPC_FRONTEND=sodalite-fe.hlrs.de
   EXPORTER_PORT=9110
-  SCHEDULER=pbs
-  SSH_USER=jesus
   LOG_LEVEL=info
-  SSH_PRIV_KEY=
