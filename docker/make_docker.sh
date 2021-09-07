@@ -51,7 +51,7 @@ fi
 
 if [[ "$ACTION" = 'push' ]]; then
   if [[ "$TARGET" = 'production' ]]; then
-    TARGET_REGISTRY=ariapclab
+    TARGET_REGISTRY=atosariapclab
   else
     TARGET_REGISTRY=${docker_registry_ip:-localhost}
   fi
