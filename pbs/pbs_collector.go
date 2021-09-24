@@ -289,6 +289,9 @@ func parseBlocks(buf io.Reader) (map[string](map[string](string)), error) {
 			return result, err
 		}
 		split_line = strings.Split(line, ":")
+		if len(split_line) < 2 {
+			return result, errors.New("did not find any of the jobs requested in the HPC")
+		}
 		label = strings.TrimSpace(split_line[1])
 		result[label] = make(map[string](string))
 		for {

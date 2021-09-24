@@ -9,7 +9,7 @@ WORKDIR /app
 RUN apk add --update --no-cache git
 
 # Get HPC exporter
-RUN git clone -b nojwt https://github.com/ari-apc-lab/hpc-exporter.git
+RUN git clone -b nojwt https://github.com/ari-apc-lab/hpc-exporter.git --depth 1
 # Build the code
 RUN cd hpc-exporter && go build
 
