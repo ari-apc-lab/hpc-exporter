@@ -53,8 +53,10 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 
 	if collector, ok := s.storePBS[key]; ok {
 		prometheus.Unregister(collector)
+		delete(s.storePBS, key)
 	} else if collector, ok := s.storeSlurm[key]; ok {
 		prometheus.Unregister(collector)
+		delete(s.storeSlurm, key)
 	} else {
 		w.WriteHeader(http.StatusNotFound)
 		w.Write([]byte("monitoring_id not found"))
