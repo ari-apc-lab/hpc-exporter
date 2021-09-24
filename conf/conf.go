@@ -3,11 +3,10 @@ package conf
 type CollectorConfig struct {
 	Host             string `json:"host"`
 	Scheduler        string `json:"scheduler"`
-	User             string
+	User             string `json:"ssh_user"`
 	Auth_method      string `json:"auth_method"`
-	Password         string
-	Private_key      string
-	Private_key_pw   string
+	Password         string `json:"ssh_password"`
+	Private_key      string `json:"ssh_pkey"`
 	Sacct_history    int    `json:"sacct_history"`
 	Scrape_interval  int    `json:"scrape_interval"`
 	Deployment_label string `json:"deployment_label"`
