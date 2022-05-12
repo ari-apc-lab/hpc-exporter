@@ -9,9 +9,8 @@ import (
 
 func (s *HpcExporterStore) ListHandler(w http.ResponseWriter, r *http.Request) {
 
-	// Return registered collector for user
+	// Return registered collectors
 	collectors := NewCollectorList(s.storeSlurm, s.storePBS)
-	// collectors.filterByUserEmail(userData.email)
 
 	jsonBytes, err := json.Marshal(collectors)
 	if err != nil {
@@ -21,7 +20,7 @@ func (s *HpcExporterStore) ListHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusOK)
 	w.Write(jsonBytes)
-	//json.NewEncoder(w).Encode(s.storePBS)
+	json.NewEncoder(w).Encode(s.storePBS)
 }
 
 type CollectorList struct {
@@ -35,27 +34,3 @@ func NewCollectorList(slurm map[string]*slurm.SlurmCollector, pbs map[string]*pb
 		Pbs_collectors:   pbs,
 	}
 }
-
-// func (s *CollectorList) filterByUserEmail(email string) {
-// 	//PBS collectors
-// 	pbs_keys_to_removed := []string{}
-// 	for key, pbs := range s.Pbs_collectors {
-// 		if pbs.Email != email {
-// 			pbs_keys_to_removed = append(pbs_keys_to_removed, key)
-// 		}
-// 	}
-// 	for _, key := range pbs_keys_to_removed {
-// 		delete(s.Pbs_collectors, key)
-// 	}
-
-// 	//Slurm collectors
-// 	slurm_keys_to_removed := []string{}
-// 	for key, pbs := range s.Slurm_collectors {
-// 		if pbs.Email != email {
-// 			slurm_keys_to_removed = append(slurm_keys_to_removed, key)
-// 		}
-// 	}
-// 	for _, key := range slurm_keys_to_removed {
-// 		delete(s.Pbs_collectors, key)
-// 	}
-// }

@@ -44,6 +44,7 @@ func main() {
 
 	router := mux.NewRouter()
 	router.Handle("/metrics", promhttp.Handler())
+	router.HandleFunc("/collector", collectorStore.ListHandler).Methods("GET")
 	router.HandleFunc("/collector", collectorStore.CreateHandler).Methods("POST")
 	router.HandleFunc("/collector", collectorStore.DeleteHandler).Methods("DELETE")
 	router.HandleFunc("/job", collectorStore.AddJobHandler).Methods("POST")
