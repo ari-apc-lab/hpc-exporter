@@ -27,6 +27,10 @@ const (
 	pSUSPENDED
 )
 
+var (
+	PBS_Terminating_States = []string{"C", "E"}
+)
+
 /*
 	from man qstat:
 	-  the job state:

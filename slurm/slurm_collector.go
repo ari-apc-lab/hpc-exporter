@@ -114,6 +114,10 @@ var LongStatusDict = map[string]int{
 	"TIMEOUT":       sTIMEOUT,
 }
 
+var (
+	SLURM_Terminating_States = []string{"COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "BOOT_FAIL", "DEADLINE", "NODE_FAIL", "PREEMPTED"}
+)
+
 var jobtags = []string{
 	"job_id",
 	"job_name",

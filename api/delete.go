@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request) {
@@ -49,6 +50,7 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	log.Infof("Deleting collector for monitoring_id %s in host %s", config.Monitoring_id, config.Host)
 	key := config.Monitoring_id + config.Host
 
 	if collector, ok := s.storePBS[key]; ok {

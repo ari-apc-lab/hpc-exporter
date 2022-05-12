@@ -1,6 +1,7 @@
 package pbs
 
 import (
+	"hpc_exporter/helper"
 	"hpc_exporter/ssh"
 	"strconv"
 	"strings"
@@ -33,10 +34,26 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 		log.Warnln("There was an error pasing the Job metrics: %s", err.Error())
 	}
 	collected := 0
+	// Remove all jobIds from collector if mapJobs is empty (no jobs were detected in target HPC).
+	if len(mapJobs) == 0 {
+		pc.JobIds = []string{}
+	} else {
+		// Remove jobIds not included in mapJobs from collector (some target jobs were not detected)
+		var existing_jobs []string
+		for _, id := range pc.JobIds {
+			_, id_exists := mapJobs[id]
+			if id_exists {
+				existing_jobs = append(existing_jobs, id)
+			}
+		}
+		pc.JobIds = existing_jobs
+	}
+
 	for jobid, mapMetrics := range mapJobs {
 		if pc.targetJobIds == "" || strings.Contains(pc.targetJobIds, jobid) {
 			pc.trackedJobs[jobid] = true
 			var startTime, createdTime time.Time
+			var state string
 			pc.clearjMetrics(jobid)
 			pc.jLabels["job_id"][jobid] = jobid
 			for key, value := range mapMetrics {
@@ -51,6 +68,7 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 					pc.jLabels["job_queue"][jobid] = value
 
 				case "job_state":
+					state = value
 					pc.jMetrics["JobState"][jobid] = float64(StatusDict[value])
 
 				case "Priority":
@@ -94,6 +112,10 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 			}
 			pc.jMetrics["JobQueued"][jobid] = startTime.Sub(createdTime).Seconds()
 			collected++
+			// Remove jobid from list of jobs (sc.JobIds) if state is one of terminating states (e.g. COMPLETED, FAILED)
+			if helper.ListContainsElement(PBS_Terminating_States, state) {
+				pc.JobIds = helper.DeleteArrayEntry(pc.JobIds, jobid)
+			}
 		}
 	}
 

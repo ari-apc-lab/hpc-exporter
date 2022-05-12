@@ -16,6 +16,7 @@
 package slurm
 
 import (
+	"hpc_exporter/helper"
 	"hpc_exporter/ssh"
 	"strconv"
 	"strings"
@@ -89,6 +90,10 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.jMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accVMEM], 64)
 		sc.jMetrics["JobRSS"][jobid] = parseMem(fields[accRSS])
 		collected++
+		// Remove jobid from list of jobs (sc.JobIds) if state is one of terminating states (e.g. COMPLETED, FAILED)
+		if helper.ListContainsElement(SLURM_Terminating_States, state) {
+			sc.JobIds = helper.DeleteArrayEntry(sc.JobIds, jobid)
+		}
 	}
 
 	if sc.targetJobIds == "" {

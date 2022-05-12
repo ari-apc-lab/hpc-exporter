@@ -6,6 +6,8 @@ import (
 	"hpc_exporter/conf"
 	"io/ioutil"
 	"net/http"
+
+	log "github.com/sirupsen/logrus"
 )
 
 func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request) {
@@ -53,7 +55,7 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 
 	s.Lock()
 	defer s.Unlock()
-
+	log.Infof("Adding job %s in host %s for monitoring_id %s", config.Job_id, config.Host, config.Monitoring_id)
 	key := config.Monitoring_id + config.Host
 
 	if collector, ok := s.storePBS[key]; ok {

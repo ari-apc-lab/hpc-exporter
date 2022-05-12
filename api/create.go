@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/prometheus/client_golang/prometheus"
+	log "github.com/sirupsen/logrus"
 )
 
 func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -57,6 +58,7 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 	defer s.Unlock()
 
 	// TODO Add support for multiple collectors of the same type and the same monitoring_id (different hpc_label)
+	log.Infof("Creating collector for monitoring_id %s in host %s", config.Monitoring_id, config.Host)
 
 	switch sched := config.Scheduler; sched {
 	case "pbs":
@@ -70,7 +72,7 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Collector created"))
 	case "slurm":
-		if _, exists := s.storePBS[key]; exists {
+		if _, exists := s.storeSlurm[key]; exists {
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("There is already a Slurm collector for the provided monitoring_id and host"))
 			return
