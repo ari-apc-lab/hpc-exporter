@@ -168,18 +168,32 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 	constLabels["monitoring_id"] = config.Monitoring_id
 
 	var metrics = map[string]PromMetricDesc{
-		"JobState":      {"slurm_job_state", "job current state", jobtags, constLabels, true},
-		"JobWalltime":   {"slurm_job_walltime_used", "job current walltime", jobtags, constLabels, true},
-		"JobNCPUs":      {"slurm_job_cpu_n", "job ncpus assigned", jobtags, constLabels, true},
-		"JobVMEM":       {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, constLabels, true},
-		"JobQueued":     {"slurm_job_queued", "job time in the queue", jobtags, constLabels, true},
-		"JobRSS":        {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, constLabels, true},
-		"JobExitCode":   {"slurm_job_exit_code", "job exit code", jobtags, constLabels, true},
-		"JobExitSignal": {"slurm_job_exit_signal", "job exit signal that caused the exit code", jobtags, constLabels, true},
-		"PartAvai":      {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
-		"PartIdle":      {"slurm_partition_cores_idle", "partition number of idle cores", partitiontags, constLabels, false},
-		"PartAllo":      {"slurm_partition_cores_allocated", "partition number of allocated cores", partitiontags, constLabels, false},
-		"PartTota":      {"slurm_partition_cores_total", "partition number of total cores", partitiontags, constLabels, false},
+		"JobState":           {"slurm_job_state", "job current state", jobtags, constLabels, true},
+		"JobWalltime":        {"slurm_job_walltime_used", "job current walltime", jobtags, constLabels, true},
+		"JobNCPUs":           {"slurm_job_cpu_n", "job ncpus assigned", jobtags, constLabels, true},
+		"JobVMEM":            {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, constLabels, true},
+		"JobQueued":          {"slurm_job_queued", "job time in the queue", jobtags, constLabels, true},
+		"JobRSS":             {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, constLabels, true},
+		"JobExitCode":        {"slurm_job_exit_code", "job exit code", jobtags, constLabels, true},
+		"JobExitSignal":      {"slurm_job_exit_signal", "job exit signal that caused the exit code", jobtags, constLabels, true},
+		"PartitionAvailable": {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
+		"PartitionCores":     {"slurm_partition_cores", "partition average number of cores per socket", partitiontags, constLabels, false},
+		"PartitionCpus":      {"slurm_partition_cpus", "partition average number of cpus per node", partitiontags, constLabels, false},
+
+		"PartitionCpusLoadLower": {"slurm_partition_cpus_load_lower", "partition average lower CPU load", partitiontags, constLabels, false},
+		"PartitionCpusLoadUpper": {"slurm_partition_cpus_load_upper", "partition average upper CPU load", partitiontags, constLabels, false},
+		"PartitionAllocMem":      {"slurm_partition_alloc_mem", "partition average allocated memory in a node", partitiontags, constLabels, false},
+		"PartitionNodes":         {"slurm_partition_nodes", "partition total number of available nodes in partition", partitiontags, constLabels, false},
+		"PartitionFreeMemLower":  {"slurm_partition_free_mem_lower", "partition average lower free memory", partitiontags, constLabels, false},
+		"PartitionFreeMemUpper":  {"slurm_partition_free_mem_upper", "partition average upper free memory", partitiontags, constLabels, false},
+		"PartitionMemory":        {"slurm_partition_memory", "partition average memory size per node", partitiontags, constLabels, false},
+		"PartitionNodeAlloc":     {"slurm_partition_node_alloc", "partition total number of allocated nodes", partitiontags, constLabels, false},
+		"PartitionNodeIdle":      {"slurm_partition_node_idle", "partition total number of idle nodes ", partitiontags, constLabels, false},
+		"PartitionNodeOther":     {"slurm_partition_node_other", "partition total number of other nodes ", partitiontags, constLabels, false},
+		"PartitionNodeTotal":     {"slurm_partition_node_total", "partition total number of nodes ", partitiontags, constLabels, false},
+		"PartitionSizeLower":     {"slurm_partition_size_lower", "partition average minimun number of nodes that can be allocated by a job", partitiontags, constLabels, false},
+		"PartitionSizeUpper":     {"slurm_partition_size_upper", "partition average maximum number of nodes that can be allocated by a job", partitiontags, constLabels, false},
+		"PartitionTime":     {"slurm_partition_time_lower", "partition average maximum time for any job", partitiontags, constLabels, false},
 	}
 
 	newerSlurmCollector := &SlurmCollector{
@@ -256,7 +270,7 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		log.Infof("Collecting metrics from Slurm...")
 		sc.trackedJobs = make(map[string]bool)
 		if sc.targetJobIds == "" {
-			// sc.collectQueue()
+			sc.collectQueue()
 		} else {
 			sc.collectAcct()
 		}
