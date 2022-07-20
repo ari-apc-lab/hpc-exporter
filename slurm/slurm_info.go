@@ -42,15 +42,25 @@ const (
 	qsiFIELDS
 )
 
-// const (
-// 	iSTATESNUMBER = 4
-// )
+const (
+	qsqPARTITION = iota
+	qsqSTATE
+	qsqNUMCPUS
+	qsqMINCPUS
+	qsqMAXCPUS
+	qsqNUMNODES
+	qsqMAXNODES
+	qsqMINMEM
+	qsqPENDINGTIME
+	qsqLEFTTIME
+	qsqUSEDTIME
+	qsqFIELDS
+)
 
 func (sc *SlurmCollector) collectInfo() {
 	log.Debugln("Collecting Info metrics...")
 	var collected uint
 
-	//TODO
 	// Read queue information combining reports from squeue and sinfo commands
 	// sinfo:  sinfo -h -O "Partition,StateLong,Available,Cores,CPUs,CPUsLoad,AllocMem,Nodes,FreeMem,Memory,NodeAIOT,Size,Time"
 	// squeue:  squeue -h --partition=medium -O “MaxCPUs,MaxNodes,MinCpus,MinMemory,NumCPUs,NumNodes,Partition,PendingTime,State,TimeLeft,TimeUsed”
@@ -60,8 +70,8 @@ func (sc *SlurmCollector) collectInfo() {
 
 	// Stats from sinfo
 
-	queueCommand := "sinfo -h -O \"Partition,StateLong,Available,Cores,CPUs,CPUsLoad,AllocMem,Nodes,FreeMem,Memory,NodeAIOT,Size,Time\""
-	session := ssh.ExecuteSSHCommand(queueCommand, sc.sshClient)
+	infoCommand := "sinfo -h -O \"Partition,StateLong,Available,Cores,CPUs,CPUsLoad,AllocMem,Nodes,FreeMem,Memory,NodeAIOT,Size,Time\" | uniq"
+	session := ssh.ExecuteSSHCommand(infoCommand, sc.sshClient)
 	if session != nil {
 		defer session.CloseSession()
 	} else {
@@ -72,14 +82,14 @@ func (sc *SlurmCollector) collectInfo() {
 	time.Sleep(1000 * time.Millisecond)
 
 	// Allocate metrics
-	metrics := make(map[string](map[string]([]float64)))
+	partitionMetrics := make(map[string](map[string]([]float64)))
 	for key, _ := range sc.pMetrics {
 		if strings.HasPrefix(key, "Partition") {
-			metrics[key] = make(map[string][]float64)
+			partitionMetrics[key] = make(map[string][]float64)
 		}
 	}
 
-	nextLine := nextLineIterator(session.OutBuffer, squeueLineParser)
+	nextLine := nextLineIterator(session.OutBuffer, sinfoLineParser)
 	for fields, err := nextLine(); err == nil; fields, err = nextLine() {
 		// check the line is correctly parsed
 		if err != nil {
@@ -91,7 +101,6 @@ func (sc *SlurmCollector) collectInfo() {
 
 		// Collecting stats only from nodes in valid state for allocation
 		if state == "idle" || state == "allocated" || state == "mixed" {
-			//sc.trackedJobs[partition] = true
 			sc.pLabels["partition"][partition] = partition
 
 			// Partition Availability
@@ -99,37 +108,37 @@ func (sc *SlurmCollector) collectInfo() {
 			if fields[qsiAVAILABLE] == "up" {
 				availability = 1.0
 			}
-			_, mapContainsKeyPartitionAvailable := metrics["PartitionAvailable"][partition]
+			_, mapContainsKeyPartitionAvailable := partitionMetrics["PartitionAvailable"][partition]
 			if !mapContainsKeyPartitionAvailable {
-				metrics["PartitionAvailable"][partition] = []float64{}
+				partitionMetrics["PartitionAvailable"][partition] = []float64{}
 			}
-			metrics["PartitionAvailable"][partition] = append(metrics["PartitionAvailable"][partition], availability)
+			partitionMetrics["PartitionAvailable"][partition] = append(partitionMetrics["PartitionAvailable"][partition], availability)
 
 			// Partition cores per node
-			_, mapContainsKeyPartitionCores := metrics["PartitionCores"][partition]
+			_, mapContainsKeyPartitionCores := partitionMetrics["PartitionCores"][partition]
 			if !mapContainsKeyPartitionCores {
-				metrics["PartitionCores"][partition] = []float64{}
+				partitionMetrics["PartitionCores"][partition] = []float64{}
 			}
 			var cores, _ = strconv.ParseFloat(fields[qsiCORES], 64)
-			metrics["PartitionCores"][partition] = append(metrics["PartitionCores"][partition], cores)
+			partitionMetrics["PartitionCores"][partition] = append(partitionMetrics["PartitionCores"][partition], cores)
 
 			// Partition cpus per core
-			_, mapContainsKeyPartitionCpus := metrics["PartitionCpus"][partition]
+			_, mapContainsKeyPartitionCpus := partitionMetrics["PartitionCpus"][partition]
 			if !mapContainsKeyPartitionCpus {
-				metrics["PartitionCpus"][partition] = []float64{}
+				partitionMetrics["PartitionCpus"][partition] = []float64{}
 			}
 			var cpus, _ = strconv.ParseFloat(fields[qsiCPUS], 64)
-			metrics["PartitionCpus"][partition] = append(metrics["PartitionCpus"][partition], cpus)
+			partitionMetrics["PartitionCpus"][partition] = append(partitionMetrics["PartitionCpus"][partition], cpus)
 
 			// CPUs Load
 			// Parse range
-			_, mapContainsKeyPartitionCpusLoadLower := metrics["PartitionCpusLoadLower"][partition]
+			_, mapContainsKeyPartitionCpusLoadLower := partitionMetrics["PartitionCpusLoadLower"][partition]
 			if !mapContainsKeyPartitionCpusLoadLower {
-				metrics["PartitionCpusLoadLower"][partition] = []float64{}
+				partitionMetrics["PartitionCpusLoadLower"][partition] = []float64{}
 			}
-			_, mapContainsKeyPartitionCpusLoadUpper := metrics["PartitionCpusLoadUpper"][partition]
+			_, mapContainsKeyPartitionCpusLoadUpper := partitionMetrics["PartitionCpusLoadUpper"][partition]
 			if !mapContainsKeyPartitionCpusLoadUpper {
-				metrics["PartitionCpusLoadUpper"][partition] = []float64{}
+				partitionMetrics["PartitionCpusLoadUpper"][partition] = []float64{}
 			}
 
 			var cpusLoadLower, cpusLoadUppper float64
@@ -142,33 +151,33 @@ func (sc *SlurmCollector) collectInfo() {
 				cpusLoadUppper, _ = strconv.ParseFloat(fields[qsiCPUSLOAD], 64)
 			}
 
-			metrics["PartitionCpusLoadLower"][partition] = append(metrics["PartitionCpusLoadLower"][partition], cpusLoadLower)
-			metrics["PartitionCpusLoadUpper"][partition] = append(metrics["PartitionCpusLoadUpper"][partition], cpusLoadUppper)
+			partitionMetrics["PartitionCpusLoadLower"][partition] = append(partitionMetrics["PartitionCpusLoadLower"][partition], cpusLoadLower)
+			partitionMetrics["PartitionCpusLoadUpper"][partition] = append(partitionMetrics["PartitionCpusLoadUpper"][partition], cpusLoadUppper)
 
 			// Alloc Mem
-			_, mapContainsKeyPartitionAllocMem := metrics["PartitionAllocMem"][partition]
+			_, mapContainsKeyPartitionAllocMem := partitionMetrics["PartitionAllocMem"][partition]
 			if !mapContainsKeyPartitionAllocMem {
-				metrics["PartitionAllocMem"][partition] = []float64{}
+				partitionMetrics["PartitionAllocMem"][partition] = []float64{}
 			}
 			var allocMem, _ = strconv.ParseFloat(fields[qsiALLOCMEM], 64)
-			metrics["PartitionAllocMem"][partition] = append(metrics["PartitionAllocMem"][partition], allocMem)
+			partitionMetrics["PartitionAllocMem"][partition] = append(partitionMetrics["PartitionAllocMem"][partition], allocMem)
 
 			// Nodes
-			_, mapContainsKeyPartitionNodes := metrics["PartitionNodes"][partition]
+			_, mapContainsKeyPartitionNodes := partitionMetrics["PartitionNodes"][partition]
 			if !mapContainsKeyPartitionNodes {
-				metrics["PartitionNodes"][partition] = []float64{}
+				partitionMetrics["PartitionNodes"][partition] = []float64{}
 			}
 			var nodes, _ = strconv.ParseFloat(fields[qsiNODES], 64)
-			metrics["PartitionNodes"][partition] = append(metrics["PartitionNodes"][partition], nodes)
+			partitionMetrics["PartitionNodes"][partition] = append(partitionMetrics["PartitionNodes"][partition], nodes)
 
 			// Parse range
-			_, mapContainsKeyPartitionFreeMemLower := metrics["PartitionFreeMemLower"][partition]
+			_, mapContainsKeyPartitionFreeMemLower := partitionMetrics["PartitionFreeMemLower"][partition]
 			if !mapContainsKeyPartitionFreeMemLower {
-				metrics["PartitionFreeMemLower"][partition] = []float64{}
+				partitionMetrics["PartitionFreeMemLower"][partition] = []float64{}
 			}
-			_, mapContainsKeyPartitionFreeMemUpper := metrics["PartitionFreeMemUpper"][partition]
+			_, mapContainsKeyPartitionFreeMemUpper := partitionMetrics["PartitionFreeMemUpper"][partition]
 			if !mapContainsKeyPartitionFreeMemUpper {
-				metrics["PartitionFreeMemUpper"][partition] = []float64{}
+				partitionMetrics["PartitionFreeMemUpper"][partition] = []float64{}
 			}
 
 			var freeMemLower, freeMemUppper float64
@@ -180,53 +189,53 @@ func (sc *SlurmCollector) collectInfo() {
 				freeMemLower, _ = strconv.ParseFloat(fields[qsiFREEMEM], 64)
 				freeMemUppper, _ = strconv.ParseFloat(fields[qsiFREEMEM], 64)
 			}
-			metrics["PartitionFreeMemLower"][partition] = append(metrics["PartitionFreeMemLower"][partition], freeMemLower)
-			metrics["PartitionFreeMemUpper"][partition] = append(metrics["PartitionFreeMemUpper"][partition], freeMemUppper)
+			partitionMetrics["PartitionFreeMemLower"][partition] = append(partitionMetrics["PartitionFreeMemLower"][partition], freeMemLower)
+			partitionMetrics["PartitionFreeMemUpper"][partition] = append(partitionMetrics["PartitionFreeMemUpper"][partition], freeMemUppper)
 
 			// Memory
-			_, mapContainsKeyPartitionMemory := metrics["PartitionMemory"][partition]
+			_, mapContainsKeyPartitionMemory := partitionMetrics["PartitionMemory"][partition]
 			if !mapContainsKeyPartitionMemory {
-				metrics["PartitionMemory"][partition] = []float64{}
+				partitionMetrics["PartitionMemory"][partition] = []float64{}
 			}
 			var memory, _ = strconv.ParseFloat(fields[qsiMEMORY], 64)
-			metrics["PartitionMemory"][partition] = append(metrics["PartitionMemory"][partition], memory)
+			partitionMetrics["PartitionMemory"][partition] = append(partitionMetrics["PartitionMemory"][partition], memory)
 
 			//Node AIOT
-			_, mapContainsKeyPartitionNodeAlloc := metrics["PartitionNodeAlloc"][partition]
+			_, mapContainsKeyPartitionNodeAlloc := partitionMetrics["PartitionNodeAlloc"][partition]
 			if !mapContainsKeyPartitionNodeAlloc {
-				metrics["PartitionNodeAlloc"][partition] = []float64{}
+				partitionMetrics["PartitionNodeAlloc"][partition] = []float64{}
 			}
-			_, mapContainsKeyPartitionNodeIdle := metrics["PartitionNodeIdle"][partition]
+			_, mapContainsKeyPartitionNodeIdle := partitionMetrics["PartitionNodeIdle"][partition]
 			if !mapContainsKeyPartitionNodeIdle {
-				metrics["PartitionNodeIdle"][partition] = []float64{}
+				partitionMetrics["PartitionNodeIdle"][partition] = []float64{}
 			}
-			_, mapContainsKeyPartitionNodeOther := metrics["PartitionNodeOther"][partition]
+			_, mapContainsKeyPartitionNodeOther := partitionMetrics["PartitionNodeOther"][partition]
 			if !mapContainsKeyPartitionNodeOther {
-				metrics["PartitionNodeOther"][partition] = []float64{}
+				partitionMetrics["PartitionNodeOther"][partition] = []float64{}
 			}
-			_, mapContainsKeyPartitionNodeTotal := metrics["PartitionNodeTotal"][partition]
+			_, mapContainsKeyPartitionNodeTotal := partitionMetrics["PartitionNodeTotal"][partition]
 			if !mapContainsKeyPartitionNodeTotal {
-				metrics["PartitionNodeTotal"][partition] = []float64{}
+				partitionMetrics["PartitionNodeTotal"][partition] = []float64{}
 			}
 			nodeaiot := strings.Split(fields[qsiNODEAIOT], "/")
 			nodealloc, _ := strconv.ParseFloat(nodeaiot[0], 64)
 			nodeidle, _ := strconv.ParseFloat(nodeaiot[1], 64)
 			nodeother, _ := strconv.ParseFloat(nodeaiot[2], 64)
 			nodetotal, _ := strconv.ParseFloat(nodeaiot[3], 64)
-			metrics["PartitionNodeAlloc"][partition] = append(metrics["PartitionNodeAlloc"][partition], nodealloc)
-			metrics["PartitionNodeIdle"][partition] = append(metrics["PartitionNodeIdle"][partition], nodeidle)
-			metrics["PartitionNodeOther"][partition] = append(metrics["PartitionNodeOther"][partition], nodeother)
-			metrics["PartitionNodeTotal"][partition] = append(metrics["PartitionNodeTotal"][partition], nodetotal)
+			partitionMetrics["PartitionNodeAlloc"][partition] = append(partitionMetrics["PartitionNodeAlloc"][partition], nodealloc)
+			partitionMetrics["PartitionNodeIdle"][partition] = append(partitionMetrics["PartitionNodeIdle"][partition], nodeidle)
+			partitionMetrics["PartitionNodeOther"][partition] = append(partitionMetrics["PartitionNodeOther"][partition], nodeother)
+			partitionMetrics["PartitionNodeTotal"][partition] = append(partitionMetrics["PartitionNodeTotal"][partition], nodetotal)
 
 			// Size
 			// Parse range
-			_, mapContainsKeyPartitionSizeLower := metrics["PartitionJobSizeLower"][partition]
+			_, mapContainsKeyPartitionSizeLower := partitionMetrics["PartitionJobSizeLower"][partition]
 			if !mapContainsKeyPartitionSizeLower {
-				metrics["PartitionJobSizeLower"][partition] = []float64{}
+				partitionMetrics["PartitionJobSizeLower"][partition] = []float64{}
 			}
-			_, mapContainsKeyPartitionSizeUpper := metrics["PartitionJobSizeUpper"][partition]
+			_, mapContainsKeyPartitionSizeUpper := partitionMetrics["PartitionJobSizeUpper"][partition]
 			if !mapContainsKeyPartitionSizeUpper {
-				metrics["PartitionJobSizeUpper"][partition] = []float64{}
+				partitionMetrics["PartitionJobSizeUpper"][partition] = []float64{}
 			}
 			var sizeLower, sizeUpper float64
 			if strings.Contains(fields[qsiSIZE], "-") {
@@ -237,28 +246,169 @@ func (sc *SlurmCollector) collectInfo() {
 				sizeLower, _ = strconv.ParseFloat(fields[qsiSIZE], 64)
 				sizeUpper, _ = strconv.ParseFloat(fields[qsiSIZE], 64)
 			}
-			metrics["PartitionJobSizeLower"][partition] = append(metrics["PartitionJobSizeLower"][partition], sizeLower)
-			metrics["PartitionJobSizeUpper"][partition] = append(metrics["PartitionJobSizeUpper"][partition], sizeUpper)
+			partitionMetrics["PartitionJobSizeLower"][partition] = append(partitionMetrics["PartitionJobSizeLower"][partition], sizeLower)
+			partitionMetrics["PartitionJobSizeUpper"][partition] = append(partitionMetrics["PartitionJobSizeUpper"][partition], sizeUpper)
 
 			// Time
+			_, mapContainsKeyPartitionTimeLimit := partitionMetrics["PartitionTimeLimit"][partition]
+			if !mapContainsKeyPartitionTimeLimit {
+				partitionMetrics["PartitionTimeLimit"][partition] = []float64{}
+			}
 			// Parse time (day-hours:minute:second)
-			metrics["PartitionTimeLimit"][partition] = append(metrics["PartitionTimeLimit"][partition], parseTime(fields[qsiTIME]))
+			partitionMetrics["PartitionTimeLimit"][partition] = append(partitionMetrics["PartitionTimeLimit"][partition], parseTime(fields[qsiTIME]))
 		}
 	}
 
 	// Stats from squeue TODO
+	queueCommand := "squeue -h -O \"Partition,State,NumCPUs,MinCpus,MaxCPUs,NumNodes,MaxNodes,MinMemory,PendingTime,TimeLeft,TimeUsed\""
+	session = ssh.ExecuteSSHCommand(queueCommand, sc.sshClient)
+	if session != nil {
+		defer session.CloseSession()
+	} else {
+		return
+	}
+
+	// wait for stdout to fill (it is being filled async by ssh)
+	time.Sleep(1000 * time.Millisecond)
+
+	nextLine = nextLineIterator(session.OutBuffer, squeueLineParser2)
+	for fields, err := nextLine(); err == nil; fields, err = nextLine() {
+		// check the line is correctly parsed
+		if err != nil {
+			log.Warnln(err.Error())
+			continue
+		}
+
+		partition := fields[qsqPARTITION]
+		sc.pLabels["partition"][partition] = partition
+
+		// Job State (Pending|Running)
+		state := 0.0
+		if fields[qsqSTATE] == "RUNNING" {
+			state = 1.0
+		}
+
+		// Average number of CPUS requested (state: pending)/allocated (state: running) per job
+		_, mapContainsKeyPartitionRequestedCPUsPerJob := partitionMetrics["PartitionRequestedCPUsPerJob"][partition]
+		if !mapContainsKeyPartitionRequestedCPUsPerJob {
+			partitionMetrics["PartitionRequestedCPUsPerJob"][partition] = []float64{}
+		}
+		_, mapContainsKeyPartitionAllocatedCPUsPerJob := partitionMetrics["PartitionAllocatedCPUsPerJob"][partition]
+		if !mapContainsKeyPartitionAllocatedCPUsPerJob {
+			partitionMetrics["PartitionAllocatedCPUsPerJob"][partition] = []float64{}
+		}
+		var cpus, _ = strconv.ParseFloat(fields[qsqNUMCPUS], 64)
+		if state == 0.0 {
+			partitionMetrics["PartitionRequestedCPUsPerJob"][partition] = append(partitionMetrics["PartitionRequestedCPUsPerJob"][partition], cpus)
+		} else {
+			partitionMetrics["PartitionAllocatedCPUsPerJob"][partition] = append(partitionMetrics["PartitionAllocatedCPUsPerJob"][partition], cpus)
+		}
+
+		// Average minimum number of requested CPUs per job
+		_, mapContainsKeyPartitionMinimumRequestedCPUsPerJob := partitionMetrics["PartitionMinimumRequestedCPUsPerJob"][partition]
+		if !mapContainsKeyPartitionMinimumRequestedCPUsPerJob {
+			partitionMetrics["PartitionMinimumRequestedCPUsPerJob"][partition] = []float64{}
+		}
+		cpus, _ = strconv.ParseFloat(fields[qsqMINCPUS], 64)
+		partitionMetrics["PartitionMinimumRequestedCPUsPerJob"][partition] = append(partitionMetrics["PartitionMinimumRequestedCPUsPerJob"][partition], cpus)
+
+		// Average maximum number of allocated CPUs per job (state: running)
+		_, mapContainsKeyPartitionMaximumAllocatedCPUsPerJob := partitionMetrics["PartitionMaximumAllocatedCPUsPerJob"][partition]
+		if !mapContainsKeyPartitionMaximumAllocatedCPUsPerJob {
+			partitionMetrics["PartitionMaximumAllocatedCPUsPerJob"][partition] = []float64{}
+		}
+		cpus, _ = strconv.ParseFloat(fields[qsqMAXCPUS], 64)
+		partitionMetrics["PartitionMaximumAllocatedCPUsPerJob"][partition] = append(partitionMetrics["PartitionMaximumAllocatedCPUsPerJob"][partition], cpus)
+
+		// Average number of nodes allocated (state: running) or minimum number of requested (state: pending) per job
+		_, mapContainsKeyPartitionMinimumRequestedNodesPerJob := partitionMetrics["PartitionMinimumRequestedNodesPerJob"][partition]
+		if !mapContainsKeyPartitionMinimumRequestedNodesPerJob {
+			partitionMetrics["PartitionMinimumRequestedNodesPerJob"][partition] = []float64{}
+		}
+		_, mapContainsKeyPartitionAllocatedNodesPerJob := partitionMetrics["PartitionAllocatedNodesPerJob"][partition]
+		if !mapContainsKeyPartitionAllocatedNodesPerJob {
+			partitionMetrics["PartitionAllocatedNodesPerJob"][partition] = []float64{}
+		}
+		var nodes, _ = strconv.ParseFloat(fields[qsqNUMNODES], 64)
+		if state == 0.0 {
+			partitionMetrics["PartitionMinimumRequestedNodesPerJob"][partition] = append(partitionMetrics["PartitionMinimumRequestedNodesPerJob"][partition], nodes)
+		} else {
+			partitionMetrics["PartitionAllocatedNodesPerJob"][partition] = append(partitionMetrics["PartitionAllocatedNodesPerJob"][partition], nodes)
+		}
+
+		// Average maximum number of nodes allocated per job (state: running)
+		_, mapContainsKeyPartitionMaximumAllocatedNodePerJob := partitionMetrics["PartitionMaximumAllocatedNodePerJob"][partition]
+		if !mapContainsKeyPartitionMaximumAllocatedNodePerJob {
+			partitionMetrics["PartitionMaximumAllocatedNodePerJob"][partition] = []float64{}
+		}
+		if state == 1.0 {
+			nodes, _ = strconv.ParseFloat(fields[qsqMAXNODES], 64)
+			partitionMetrics["PartitionMaximumAllocatedNodePerJob"][partition] = append(partitionMetrics["PartitionMaximumAllocatedNodePerJob"][partition], nodes)
+		}
+
+		// Average minimum memory requested per job
+		_, mapContainsKeyPartitionMinimumRequestedMemoryPerJob := partitionMetrics["PartitionMinimumRequestedMemoryPerJob"][partition]
+		if !mapContainsKeyPartitionMinimumRequestedMemoryPerJob {
+			partitionMetrics["PartitionMinimumRequestedMemoryPerJob"][partition] = []float64{}
+		}
+
+		mem := parseMemField(fields[qsqMINMEM])
+		partitionMetrics["PartitionMinimumRequestedMemoryPerJob"][partition] = append(partitionMetrics["PartitionMinimumRequestedMemoryPerJob"][partition], mem)
+
+		// Average queued time per job
+		_, mapContainsKeyPartitionQueueTimePerJob := partitionMetrics["PartitionQueueTimePerJob"][partition]
+		if !mapContainsKeyPartitionQueueTimePerJob {
+			partitionMetrics["PartitionQueueTimePerJob"][partition] = []float64{}
+		}
+		var time, _ = strconv.ParseFloat(fields[qsqPENDINGTIME], 64)
+		partitionMetrics["PartitionQueueTimePerJob"][partition] = append(partitionMetrics["PartitionQueueTimePerJob"][partition], time)
+
+		// Average time left to exhaust maximum time per job
+		_, mapContainsKeyPartitionTimeLeftPerJob := partitionMetrics["PartitionTimeLeftPerJob"][partition]
+		if !mapContainsKeyPartitionTimeLeftPerJob {
+			partitionMetrics["PartitionTimeLeftPerJob"][partition] = []float64{}
+		}
+		// Parse time (day-hours:minute:second)
+		partitionMetrics["PartitionTimeLeftPerJob"][partition] = append(partitionMetrics["PartitionTimeLeftPerJob"][partition], parseTime(fields[qsqLEFTTIME]))
+
+		// Average execution time per job (state: running)
+		// Average execution time limit per job (state: pending)
+
+		_, mapContainsKeyPartitionExecutionTimePerJob := partitionMetrics["PartitionExecutionTimePerJob"][partition]
+		if !mapContainsKeyPartitionExecutionTimePerJob {
+			partitionMetrics["PartitionExecutionTimePerJob"][partition] = []float64{}
+		}
+		_, mapContainsKeyPartitionTimeLimitPerJob := partitionMetrics["PartitionTimeLimitPerJob"][partition]
+		if !mapContainsKeyPartitionTimeLimitPerJob {
+			partitionMetrics["PartitionTimeLimitPerJob"][partition] = []float64{}
+		}
+		// Parse time (day-hours:minute:second)
+		if state == 1.0 {
+			partitionMetrics["PartitionTimeLeftPerJob"][partition] = append(partitionMetrics["PartitionTimeLeftPerJob"][partition], parseTime(fields[qsqUSEDTIME]))
+		} else {
+			partitionMetrics["PartitionTimeLimitPerJob"][partition] = append(partitionMetrics["PartitionTimeLimitPerJob"][partition], parseTime(fields[qsqUSEDTIME]))
+		}
+
+	}
+
+	// Computing average
 	averageMetrics := []string{
 		"PartitionAvailable", "PartitionCores", "PartitionCpus", "PartitionCpusLoadLower",
 		"PartitionCpusLoadUpper", "PartitionAllocMem", "PartitionFreeMemLower", "PartitionFreeMemUpper",
 		"PartitionMemory", "PartitionJobSizeLower", "PartitionJobSizeUpper",
-		"PartitionTimeLimit",
+		"PartitionTimeLimit", "PartitionRequestedCPUsPerJob", "PartitionAllocatedCPUsPerJob",
+		"PartitionMinimumRequestedCPUsPerJob", "PartitionMaximumAllocatedCPUsPerJob",
+		"PartitionMinimumRequestedNodesPerJob", "PartitionAllocatedNodesPerJob",
+		"PartitionMaximumAllocatedNodePerJob", "PartitionMinimumRequestedMemoryPerJob",
+		"PartitionQueueTimePerJob", "PartitionTimeLeftPerJob", "PartitionExecutionTimePerJob",
+		"PartitionTimeLimitPerJob",
 	}
 
 	totalMetrics := []string{
 		"PartitionNodes", "PartitionNodeAlloc", "PartitionNodeIdle",
 		"PartitionNodeOther", "PartitionNodeTotal",
 	}
-	for metric, metricMap := range metrics {
+	for metric, metricMap := range partitionMetrics {
 		for partition, value := range metricMap {
 			if stringInSlice(metric, averageMetrics) {
 				sc.pMetrics[metric][partition], _ = stats.Mean(value)
@@ -267,10 +417,20 @@ func (sc *SlurmCollector) collectInfo() {
 				sc.pMetrics[metric][partition], _ = stats.Sum(value)
 			}
 		}
-
 	}
+
 	collected = uint(len(sc.pMetrics["PartitionAvailable"]))
 	log.Infof("%d partition info collected", collected)
+}
+
+func parseMemField(sMem string) float64 {
+	unit := sMem[len(sMem)-1:]
+	factor := 1.0
+	if unit == "G" {
+		factor = 1024.0
+	}
+	var mem, _ = strconv.ParseFloat(sMem[:len(sMem)-1], 64)
+	return factor * mem
 }
 
 func parseTime(sTime string) float64 {
@@ -298,11 +458,22 @@ func parseTime(sTime string) float64 {
 	return days*24*60*60 + hours*60*60 + minutes*60 + seconds
 }
 
-func squeueLineParser(line string) []string {
+func sinfoLineParser(line string) []string {
 	fields := strings.Fields(line)
 
 	if len(fields) < qsiFIELDS {
 		log.Warnf("sinfo line parse failed (%s): %d fields expected, %d parsed", line, qsiFIELDS, len(fields))
+		return nil
+	}
+
+	return fields
+}
+
+func squeueLineParser2(line string) []string {
+	fields := strings.Fields(line)
+
+	if len(fields) < qsqFIELDS {
+		log.Warnf("squeue line parse failed (%s): %d fields expected, %d parsed", line, qFIELDS, len(fields))
 		return nil
 	}
 
@@ -317,26 +488,3 @@ func stringInSlice(a string, list []string) bool {
 	}
 	return false
 }
-
-// func sinfoLineParser(line string) []string {
-// 	fields := strings.Fields(line)
-
-// 	if len(fields) != iFIELDS {
-// 		log.Warnf("sinfo line parse failed (%s): %d fields expected, %d parsed", line, iFIELDS, len(fields))
-// 		return nil
-// 	}
-
-// 	return fields
-// }
-
-// func parseNodes(ns string) (float64, float64, float64, error) {
-
-// 	nodesByStatus := strings.Split(ns, "/")
-// 	if len(nodesByStatus) != iSTATESNUMBER {
-// 		return 0, 0, 0, errors.New("Could not parse nodes: " + ns)
-// 	}
-// 	alloc, _ := strconv.ParseFloat(nodesByStatus[0], 64)
-// 	idle, _ := strconv.ParseFloat(nodesByStatus[1], 64)
-// 	total, _ := strconv.ParseFloat(nodesByStatus[3], 64)
-// 	return idle, alloc, total, nil
-// }
