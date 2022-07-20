@@ -116,6 +116,7 @@ func NewerPBSCollector(config *conf.CollectorConfig) *PBSCollector {
 		"QueueEnabled":    {"pbs_queue_enabled", "queue if enabled 1, disabled 0", queuetags, constLabels, false},
 		"QueueStarted":    {"pbs_queue_started", "queue if started 1, stopped 0", queuetags, constLabels, false},
 		"QueueQueued":     {"pbs_queue_jobs_queued", "number of jobs in a queued state in this queue", queuetags, constLabels, false},
+		"QueueBegun":      {"pbs_queue_jobs_begun", "number of jobs in a begun state in this queue", queuetags, constLabels, false},
 		"QueueRunning":    {"pbs_queue_jobs_running", "number of jobs in a running state in this queue", queuetags, constLabels, false},
 		"QueueHeld":       {"pbs_queue_jobs_held", "number of jobs in a held state in this queue", queuetags, constLabels, false},
 		"QueueWaiting":    {"pbs_queue_jobs_waiting", "number of jobs in a waiting state in this queue", queuetags, constLabels, false},
@@ -292,24 +293,26 @@ func parseBlocks(buf io.Reader) (map[string](map[string](string)), error) {
 		} else if err != nil {
 			return result, err
 		}
-		split_line = strings.Split(line, ":")
-		if len(split_line) < 2 {
-			return result, errors.New("did not find any of the jobs requested in the HPC")
-		}
-		label = strings.TrimSpace(split_line[1])
-		result[label] = make(map[string](string))
-		for {
-			line, err = buffer.ReadString('\n')
-			if err == io.EOF {
-				return result, nil
-			} else if err != nil {
-				return result, err
-			}
-			split_line = strings.Split(line, "=")
+		if strings.Contains(line, ":") {
+			split_line = strings.Split(line, ":")
 			if len(split_line) < 2 {
-				break
+				return result, errors.New("did not find any of the jobs requested in the HPC")
 			}
-			result[label][strings.TrimSpace(split_line[0])] = strings.TrimSpace(split_line[1])
+			label = strings.TrimSpace(split_line[1])
+			result[label] = make(map[string](string))
+			for {
+				line, err = buffer.ReadString('\n')
+				if err == io.EOF {
+					return result, nil
+				} else if err != nil {
+					return result, err
+				}
+				split_line = strings.Split(line, "=")
+				if len(split_line) < 2 {
+					break
+				}
+				result[label][strings.TrimSpace(split_line[0])] = strings.TrimSpace(split_line[1])
+			}
 		}
 	}
 }

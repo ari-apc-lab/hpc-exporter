@@ -14,7 +14,7 @@ func (pc *PBSCollector) collectQueues(ch chan<- prometheus.Metric) {
 
 	log.Debugln("Collecting Queue metrics...")
 
-	queueCommand := "qstat -Q -f1"
+	queueCommand := "source /etc/profile; qstat -Q -f -w"
 
 	sshSession := ssh.ExecuteSSHCommand(queueCommand, pc.sshClient)
 	if sshSession != nil {
