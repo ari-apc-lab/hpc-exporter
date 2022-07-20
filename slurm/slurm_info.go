@@ -60,6 +60,7 @@ const (
 func (sc *SlurmCollector) collectInfo() {
 	log.Debugln("Collecting Info metrics...")
 	var collected uint
+	var metricsAvailable bool = false
 
 	// Read queue information combining reports from squeue and sinfo commands
 	// sinfo:  sinfo -h -O "Partition,StateLong,Available,Cores,CPUs,CPUsLoad,AllocMem,Nodes,FreeMem,Memory,NodeAIOT,Size,Time"
@@ -101,6 +102,7 @@ func (sc *SlurmCollector) collectInfo() {
 
 		// Collecting stats only from nodes in valid state for allocation
 		if state == "idle" || state == "allocated" || state == "mixed" {
+			metricsAvailable = true
 			sc.pLabels["partition"][partition] = partition
 
 			// Partition Availability
@@ -259,7 +261,7 @@ func (sc *SlurmCollector) collectInfo() {
 		}
 	}
 
-	// Stats from squeue TODO
+	// Stats from squeue
 	queueCommand := "squeue -h -O \"Partition,State,NumCPUs,MinCpus,MaxCPUs,NumNodes,MaxNodes,MinMemory,PendingTime,TimeLeft,TimeUsed\""
 	session = ssh.ExecuteSSHCommand(queueCommand, sc.sshClient)
 	if session != nil {
@@ -281,6 +283,7 @@ func (sc *SlurmCollector) collectInfo() {
 
 		partition := fields[qsqPARTITION]
 		sc.pLabels["partition"][partition] = partition
+		metricsAvailable = true
 
 		// Job State (Pending|Running)
 		state := 0.0
@@ -408,19 +411,24 @@ func (sc *SlurmCollector) collectInfo() {
 		"PartitionNodes", "PartitionNodeAlloc", "PartitionNodeIdle",
 		"PartitionNodeOther", "PartitionNodeTotal",
 	}
-	for metric, metricMap := range partitionMetrics {
-		for partition, value := range metricMap {
-			if stringInSlice(metric, averageMetrics) {
-				sc.pMetrics[metric][partition], _ = stats.Mean(value)
-			}
-			if stringInSlice(metric, totalMetrics) {
-				sc.pMetrics[metric][partition], _ = stats.Sum(value)
+
+	if metricsAvailable {
+		for metric, metricMap := range partitionMetrics {
+			for partition, value := range metricMap {
+				if stringInSlice(metric, averageMetrics) {
+					sc.pMetrics[metric][partition], _ = stats.Mean(value)
+				}
+				if stringInSlice(metric, totalMetrics) {
+					sc.pMetrics[metric][partition], _ = stats.Sum(value)
+				}
 			}
 		}
-	}
 
-	collected = uint(len(sc.pMetrics["PartitionAvailable"]))
-	log.Infof("%d partition info collected", collected)
+		collected = uint(len(sc.pMetrics["PartitionAvailable"]))
+		log.Infof("%d partition info collected", collected)
+	} else {
+		log.Warnf("No metrics could be collected from host %s. Commands sinfo and squeue could not be available for user", sc.sshConfig.Host)
+	}
 }
 
 func parseMemField(sMem string) float64 {
