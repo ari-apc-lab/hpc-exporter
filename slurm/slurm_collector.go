@@ -179,7 +179,6 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		"PartitionAvailable": {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
 		"PartitionCores":     {"slurm_partition_cores", "partition average number of cores per socket", partitiontags, constLabels, false},
 		"PartitionCpus":      {"slurm_partition_cpus", "partition average number of cpus per node", partitiontags, constLabels, false},
-
 		"PartitionCpusLoadLower": {"slurm_partition_cpus_load_lower", "partition average lower CPU load", partitiontags, constLabels, false},
 		"PartitionCpusLoadUpper": {"slurm_partition_cpus_load_upper", "partition average upper CPU load", partitiontags, constLabels, false},
 		"PartitionAllocMem":      {"slurm_partition_alloc_mem", "partition average allocated memory in a node", partitiontags, constLabels, false},
@@ -191,9 +190,9 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		"PartitionNodeIdle":      {"slurm_partition_node_idle", "partition total number of idle nodes ", partitiontags, constLabels, false},
 		"PartitionNodeOther":     {"slurm_partition_node_other", "partition total number of other nodes ", partitiontags, constLabels, false},
 		"PartitionNodeTotal":     {"slurm_partition_node_total", "partition total number of nodes ", partitiontags, constLabels, false},
-		"PartitionSizeLower":     {"slurm_partition_size_lower", "partition average minimun number of nodes that can be allocated by a job", partitiontags, constLabels, false},
-		"PartitionSizeUpper":     {"slurm_partition_size_upper", "partition average maximum number of nodes that can be allocated by a job", partitiontags, constLabels, false},
-		"PartitionTime":     {"slurm_partition_time_lower", "partition average maximum time for any job", partitiontags, constLabels, false},
+		"PartitionJobSizeLower":     {"slurm_partition_job_size_lower", "partition average minimun number of nodes that can be allocated by a job", partitiontags, constLabels, false},
+		"PartitionJobSizeUpper":     {"slurm_partition_job_size_upper", "partition average maximum number of nodes that can be allocated by a job", partitiontags, constLabels, false},
+		"PartitionTimeLimit":     {"slurm_partition_time_limit", "partition average time limit for any job", partitiontags, constLabels, false},
 	}
 
 	newerSlurmCollector := &SlurmCollector{
