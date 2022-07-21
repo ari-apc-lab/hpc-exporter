@@ -205,7 +205,6 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		"PartitionQueueTimePerJob":              {"slurm_partition_queue_time_per_job", "Average queue time per job", partitiontags, constLabels, false},
 		"PartitionTimeLeftPerJob":               {"slurm_partition_time_left_per_job", "Average time left to exhaust maximum time per job", partitiontags, constLabels, false},
 		"PartitionExecutionTimePerJob":          {"slurm_partition_execution_time_per_job", "Average execution time per job", partitiontags, constLabels, false},
-		"PartitionTimeLimitPerJob":              {"slurm_partition_time_limit_per_job", "Average requested time limit per job", partitiontags, constLabels, false},
 	}
 
 	newerSlurmCollector := &SlurmCollector{

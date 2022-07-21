@@ -375,23 +375,15 @@ func (sc *SlurmCollector) collectInfo() {
 		partitionMetrics["PartitionTimeLeftPerJob"][partition] = append(partitionMetrics["PartitionTimeLeftPerJob"][partition], parseTime(fields[qsqLEFTTIME]))
 
 		// Average execution time per job (state: running)
-		// Average execution time limit per job (state: pending)
-
 		_, mapContainsKeyPartitionExecutionTimePerJob := partitionMetrics["PartitionExecutionTimePerJob"][partition]
 		if !mapContainsKeyPartitionExecutionTimePerJob {
 			partitionMetrics["PartitionExecutionTimePerJob"][partition] = []float64{}
 		}
-		_, mapContainsKeyPartitionTimeLimitPerJob := partitionMetrics["PartitionTimeLimitPerJob"][partition]
-		if !mapContainsKeyPartitionTimeLimitPerJob {
-			partitionMetrics["PartitionTimeLimitPerJob"][partition] = []float64{}
-		}
+
 		// Parse time (day-hours:minute:second)
 		if state == 1.0 {
-			partitionMetrics["PartitionTimeLeftPerJob"][partition] = append(partitionMetrics["PartitionTimeLeftPerJob"][partition], parseTime(fields[qsqUSEDTIME]))
-		} else {
-			partitionMetrics["PartitionTimeLimitPerJob"][partition] = append(partitionMetrics["PartitionTimeLimitPerJob"][partition], parseTime(fields[qsqUSEDTIME]))
+			partitionMetrics["PartitionExecutionTimePerJob"][partition] = append(partitionMetrics["PartitionExecutionTimePerJob"][partition], parseTime(fields[qsqUSEDTIME]))
 		}
-
 	}
 
 	// Computing average
@@ -404,7 +396,6 @@ func (sc *SlurmCollector) collectInfo() {
 		"PartitionMinimumRequestedNodesPerJob", "PartitionAllocatedNodesPerJob",
 		"PartitionMaximumAllocatedNodePerJob", "PartitionMinimumRequestedMemoryPerJob",
 		"PartitionQueueTimePerJob", "PartitionTimeLeftPerJob", "PartitionExecutionTimePerJob",
-		"PartitionTimeLimitPerJob",
 	}
 
 	totalMetrics := []string{
@@ -415,11 +406,13 @@ func (sc *SlurmCollector) collectInfo() {
 	if metricsAvailable {
 		for metric, metricMap := range partitionMetrics {
 			for partition, value := range metricMap {
-				if stringInSlice(metric, averageMetrics) {
-					sc.pMetrics[metric][partition], _ = stats.Mean(value)
-				}
-				if stringInSlice(metric, totalMetrics) {
-					sc.pMetrics[metric][partition], _ = stats.Sum(value)
+				if len(value) > 0 {
+					if stringInSlice(metric, averageMetrics) {
+						sc.pMetrics[metric][partition], _ = stats.Mean(value)
+					}
+					if stringInSlice(metric, totalMetrics) {
+						sc.pMetrics[metric][partition], _ = stats.Sum(value)
+					}
 				}
 			}
 		}
