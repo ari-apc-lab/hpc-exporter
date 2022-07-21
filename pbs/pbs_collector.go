@@ -100,29 +100,36 @@ func NewerPBSCollector(config *conf.CollectorConfig) *PBSCollector {
 	constLabels["monitoring_id"] = config.Monitoring_id
 
 	var metrics = map[string]PromMetricDesc{
-		"JobState":        {"pbs_job_state", "job current state", jobtags, constLabels, true},
-		"JobPriority":     {"pbs_job_priority", "job current priority", jobtags, constLabels, true},
-		"JobWalltimeUsed": {"pbs_job_walltime_used", "job walltime used, time the job has been running (sec)", jobtags, constLabels, true},
-		"JobWalltimeMax":  {"pbs_job_walltime_max", "job maximum walltime allowed (sec)", jobtags, constLabels, true},
-		"JobWalltimeRem":  {"pbs_job_walltime_remaining", "job walltime remaining (sec)", jobtags, constLabels, true},
-		"JobCPUTime":      {"pbs_job_cpu_time", "job cpu time expended (sec)", jobtags, constLabels, true},
-		"JobNCPUs":        {"pbs_job_cpu_n", "job number of threads requested by the job", jobtags, constLabels, true},
-		"JobVMEM":         {"pbs_job_mem_virtual", "job virtual memory used", jobtags, constLabels, true},
-		"JobQueued":       {"pbs_job_time_queued", "job time spent between creation and running start (or now)", jobtags, constLabels, true},
-		"JobRSS":          {"pbs_job_mem_physical", "job physical memory used", jobtags, constLabels, true},
-		"JobExitStatus":   {"pbs_job_exit_status", "job exit status. -1 if not completed", jobtags, constLabels, true},
-		"QueueTotal":      {"pbs_queue_jobs_total", "queue total number of jobs assigned", queuetags, constLabels, false},
-		"QueueMax":        {"pbs_queue_jobs_max", "queue max number of jobs", queuetags, constLabels, false},
-		"QueueEnabled":    {"pbs_queue_enabled", "queue if enabled 1, disabled 0", queuetags, constLabels, false},
-		"QueueStarted":    {"pbs_queue_started", "queue if started 1, stopped 0", queuetags, constLabels, false},
-		"QueueQueued":     {"pbs_queue_jobs_queued", "number of jobs in a queued state in this queue", queuetags, constLabels, false},
-		"QueueBegun":      {"pbs_queue_jobs_begun", "number of jobs in a begun state in this queue", queuetags, constLabels, false},
-		"QueueRunning":    {"pbs_queue_jobs_running", "number of jobs in a running state in this queue", queuetags, constLabels, false},
-		"QueueHeld":       {"pbs_queue_jobs_held", "number of jobs in a held state in this queue", queuetags, constLabels, false},
-		"QueueWaiting":    {"pbs_queue_jobs_waiting", "number of jobs in a waiting state in this queue", queuetags, constLabels, false},
-		"QueueTransit":    {"pbs_queue_jobs_transit", "number of jobs in a transit state in this queue", queuetags, constLabels, false},
-		"QueueExiting":    {"pbs_queue_jobs_exiting", "number of jobs in a exiting state in this queue", queuetags, constLabels, false},
-		"QueueComplete":   {"pbs_queue_jobs_complete", "number of jobs in a complete state in this queue", queuetags, constLabels, false},
+		"JobState":         {"pbs_job_state", "job current state", jobtags, constLabels, true},
+		"JobPriority":      {"pbs_job_priority", "job current priority", jobtags, constLabels, true},
+		"JobWalltimeUsed":  {"pbs_job_walltime_used", "job walltime used, time the job has been running (sec)", jobtags, constLabels, true},
+		"JobWalltimeMax":   {"pbs_job_walltime_max", "job maximum walltime allowed (sec)", jobtags, constLabels, true},
+		"JobWalltimeRem":   {"pbs_job_walltime_remaining", "job walltime remaining (sec)", jobtags, constLabels, true},
+		"JobCPUTime":       {"pbs_job_cpu_time", "job cpu time expended (sec)", jobtags, constLabels, true},
+		"JobNCPUs":         {"pbs_job_cpu_n", "job number of threads requested by the job", jobtags, constLabels, true},
+		"JobVMEM":          {"pbs_job_mem_virtual", "job virtual memory used", jobtags, constLabels, true},
+		"JobQueued":        {"pbs_job_time_queued", "job time spent between creation and running start (or now)", jobtags, constLabels, true},
+		"JobRSS":           {"pbs_job_mem_physical", "job physical memory used", jobtags, constLabels, true},
+		"JobExitStatus":    {"pbs_job_exit_status", "job exit status. -1 if not completed", jobtags, constLabels, true},
+		"QueueTotal":       {"pbs_queue_jobs_total", "queue total number of jobs assigned", queuetags, constLabels, false},
+		"QueueMax":         {"pbs_queue_jobs_max", "queue max number of jobs", queuetags, constLabels, false},
+		"QueueEnabled":     {"pbs_queue_enabled", "queue if enabled 1, disabled 0", queuetags, constLabels, false},
+		"QueueStarted":     {"pbs_queue_started", "queue if started 1, stopped 0", queuetags, constLabels, false},
+		"QueueQueued":      {"pbs_queue_jobs_queued", "number of jobs in a queued state in this queue", queuetags, constLabels, false},
+		"QueueBegun":       {"pbs_queue_jobs_begun", "number of jobs in a begun state in this queue", queuetags, constLabels, false},
+		"QueueRunning":     {"pbs_queue_jobs_running", "number of jobs in a running state in this queue", queuetags, constLabels, false},
+		"QueueHeld":        {"pbs_queue_jobs_held", "number of jobs in a held state in this queue", queuetags, constLabels, false},
+		"QueueWaiting":     {"pbs_queue_jobs_waiting", "number of jobs in a waiting state in this queue", queuetags, constLabels, false},
+		"QueueTransit":     {"pbs_queue_jobs_transit", "number of jobs in a transit state in this queue", queuetags, constLabels, false},
+		"QueueExiting":     {"pbs_queue_jobs_exiting", "number of jobs in a exiting state in this queue", queuetags, constLabels, false},
+		"QueueComplete":    {"pbs_queue_jobs_complete", "number of jobs in a complete state in this queue", queuetags, constLabels, false},
+		"QueuePriority":    {"pbs_queue_priority", "Priority of this queue", queuetags, constLabels, false},
+		"QueueMinNodes":    {"pbs_queue_min_nodes", "Minimum number of nodes in this queue", queuetags, constLabels, false},
+		"QueueMaxNodes":    {"pbs_queue_max_nodes", "Maximum number of nodes in this queue", queuetags, constLabels, false},
+		"QueueMaxWalltime": {"pbs_queue_max_walltime", "Maximum walltime for jobs in this queue", queuetags, constLabels, false},
+		"QueueAvailNodes":  {"pbs_queue_avail_nodes", "Available nodes in this queue", queuetags, constLabels, false},
+		"QueueAssignNodes": {"pbs_queue_assign_nodes", "Nodes assigned in this queue", queuetags, constLabels, false},
+		"QueueAssignCpus":  {"pbs_queue_assign_cpus", "CPUs assigned in this queue", queuetags, constLabels, false},
 	}
 
 	newerPBSCollector := &PBSCollector{
@@ -307,7 +314,7 @@ func parseBlocks(buf io.Reader) (map[string](map[string](string)), error) {
 				} else if err != nil {
 					return result, err
 				}
-				split_line = strings.Split(line, "=")
+				split_line = strings.Split(line, " = ")
 				if len(split_line) < 2 {
 					break
 				}

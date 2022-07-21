@@ -38,7 +38,7 @@ func (pc *PBSCollector) collectQueues(ch chan<- prometheus.Metric) {
 		pc.qLabels["queue_name"][queue] = queue
 		for key, value := range mapMetrics {
 			switch key {
-			case "queue_Type":
+			case "queue_type":
 				pc.qLabels["queue_type"][queue] = value
 			case "total_jobs":
 				pc.qMetrics["QueueTotal"][queue], _ = strconv.ParseFloat(value, 64)
@@ -62,6 +62,20 @@ func (pc *PBSCollector) collectQueues(ch chan<- prometheus.Metric) {
 				} else {
 					pc.qMetrics["QueueStarted"][queue] = 0
 				}
+			case "Priority":
+				pc.qMetrics["QueuePriority"][queue], _ = strconv.ParseFloat(value, 64)
+			case "resources_min.nodecounter":
+				pc.qMetrics["QueueMinNodes"][queue], _ = strconv.ParseFloat(value, 64)
+			case "resources_max.nodecounter":
+				pc.qMetrics["QueueMaxNodes"][queue], _ = strconv.ParseFloat(value, 64)
+			case "resources_max.walltime":
+				pc.qMetrics["QueueMaxWalltime"][queue], _ = parsePBSTime(value)
+			case "resources_available.nodecounter":
+				pc.qMetrics["QueueAvailNodes"][queue], _ = strconv.ParseFloat(value, 64)
+			case "resources_assigned.nodecounter":
+				pc.qMetrics["QueueAssignNodes"][queue], _ = strconv.ParseFloat(value, 64)
+			case "resources_assigned.ncpus":
+				pc.qMetrics["QueueAssignCpus"][queue], _ = strconv.ParseFloat(value, 64)
 			}
 		}
 	}
@@ -72,15 +86,23 @@ func (pc *PBSCollector) collectQueues(ch chan<- prometheus.Metric) {
 func (pc *PBSCollector) clearQueueMetrics(queue string) {
 	/*We give default values to all the metrics, they will be overwritten with the collected values if they exist, otherwise they keep these values.
 	For example, if the job hasn't started running, the memory metrics will stay at 0. This way we also ensure that all the metrics exist as well*/
-	pc.qMetrics["QueueTotal"][queue] = 0
+	pc.qMetrics["QueueTotal"][queue] = -1
 	pc.qMetrics["QueueMax"][queue] = -1
-	pc.qMetrics["QueueEnabled"][queue] = 0
-	pc.qMetrics["QueueStarted"][queue] = 0
-	pc.qMetrics["QueueQueued"][queue] = 0
-	pc.qMetrics["QueueRunning"][queue] = 0
-	pc.qMetrics["QueueHeld"][queue] = 0
-	pc.qMetrics["QueueWaiting"][queue] = 0
-	pc.qMetrics["QueueTransit"][queue] = 0
-	pc.qMetrics["QueueExiting"][queue] = 0
-	pc.qMetrics["QueueComplete"][queue] = 0
+	pc.qMetrics["QueueEnabled"][queue] = -1
+	pc.qMetrics["QueueStarted"][queue] = -1
+	pc.qMetrics["QueueQueued"][queue] = -1
+	pc.qMetrics["QueueBegun"][queue] = -1
+	pc.qMetrics["QueueRunning"][queue] = -1
+	pc.qMetrics["QueueHeld"][queue] = -1
+	pc.qMetrics["QueueWaiting"][queue] = -1
+	pc.qMetrics["QueueTransit"][queue] = -1
+	pc.qMetrics["QueueExiting"][queue] = -1
+	pc.qMetrics["QueueComplete"][queue] = -1
+	pc.qMetrics["QueuePriority"][queue] = -1
+	pc.qMetrics["QueueMinNodes"][queue] = -1
+	pc.qMetrics["QueueMaxNodes"][queue] = -1
+	pc.qMetrics["QueueMaxWalltime"][queue] = -1
+	pc.qMetrics["QueueAvailNodes"][queue] = -1
+	pc.qMetrics["QueueAssignNodes"][queue] = -1
+	pc.qMetrics["QueueAssignCpus"][queue] = -1
 }
