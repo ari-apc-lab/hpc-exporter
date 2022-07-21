@@ -291,6 +291,22 @@ func (sc *SlurmCollector) collectInfo() {
 			state = 1.0
 		}
 
+		//Number of Pending and running jobs in partition
+		_, mapContainsKeyPartitionRunningJobs := partitionMetrics["PartitionRunningJobs"][partition]
+		if !mapContainsKeyPartitionRunningJobs {
+			partitionMetrics["PartitionRunningJobs"][partition] = []float64{}
+		}
+		_, mapContainsKeyPartitionPendingJobs := partitionMetrics["PartitionPendingJobs"][partition]
+		if !mapContainsKeyPartitionPendingJobs {
+			partitionMetrics["PartitionPendingJobs"][partition] = []float64{}
+		}
+
+		if fields[qsqSTATE] == "RUNNING" {
+			partitionMetrics["PartitionRunningJobs"][partition] = append(partitionMetrics["PartitionRunningJobs"][partition], 1.0)
+		} else {
+			partitionMetrics["PartitionPendingJobs"][partition] = append(partitionMetrics["PartitionPendingJobs"][partition], 1.0)
+		}
+
 		// Average number of CPUS requested (state: pending)/allocated (state: running) per job
 		_, mapContainsKeyPartitionRequestedCPUsPerJob := partitionMetrics["PartitionRequestedCPUsPerJob"][partition]
 		if !mapContainsKeyPartitionRequestedCPUsPerJob {
@@ -400,17 +416,21 @@ func (sc *SlurmCollector) collectInfo() {
 
 	totalMetrics := []string{
 		"PartitionNodes", "PartitionNodeAlloc", "PartitionNodeIdle",
-		"PartitionNodeOther", "PartitionNodeTotal",
+		"PartitionNodeOther", "PartitionNodeTotal", "PartitionRunningJobs", "PartitionPendingJobs",
 	}
 
 	if metricsAvailable {
 		for metric, metricMap := range partitionMetrics {
 			for partition, value := range metricMap {
-				if len(value) > 0 {
-					if stringInSlice(metric, averageMetrics) {
+				if stringInSlice(metric, averageMetrics) {
+					sc.pMetrics[metric][partition] = -1
+					if len(value) > 0 {
 						sc.pMetrics[metric][partition], _ = stats.Mean(value)
 					}
-					if stringInSlice(metric, totalMetrics) {
+				}
+				if stringInSlice(metric, totalMetrics) {
+					sc.pMetrics[metric][partition] = 0
+					if len(value) > 0 {
 						sc.pMetrics[metric][partition], _ = stats.Sum(value)
 					}
 				}
