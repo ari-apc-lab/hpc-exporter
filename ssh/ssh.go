@@ -40,7 +40,7 @@ type SSHSession struct {
 
 func NewSSHConfigByPassword(user, password, host string, port int) *SSHConfig {
 
-	log.Info("Trying to create a SSHConfig of type NewSSHConfigByPassword...")
+	log.Debug("Trying to create a SSHConfig of type NewSSHConfigByPassword...")
 
 	return &SSHConfig{
 		Config: &ssh.ClientConfig{
@@ -64,7 +64,7 @@ func NewSSHConfigByPublicKeys(user, host string, port int, key []byte) *SSHConfi
 	// If you have an encrypted private key, the crypto/x509 package
 	// can be used to decrypt it.
 
-	log.Info("Trying to create a SSHConfig of type NewSSHConfigByPublicKeys...")
+	log.Debug("Trying to create a SSHConfig of type NewSSHConfigByPublicKeys...")
 
 	// Create the Signer for this private key.
 	signer, err := ssh.ParsePrivateKey(key)

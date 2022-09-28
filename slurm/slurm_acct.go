@@ -41,7 +41,8 @@ const (
 )
 
 func (sc *SlurmCollector) collectAcct() {
-	log.Debugln("Collecting Acct metrics...")
+	log.Infof("Collecting metrics for jobs %s in host %s", sc.targetJobIds, sc.sshConfig.Host)
+	log.Debugln("Collecting metrics using acct command ...")
 	var collected uint
 
 	startTime := getstarttime(sc.sacctHistory)

@@ -280,14 +280,14 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 			return
 		}
 		defer sc.sshClient.Close()
-		log.Infof("Collecting metrics from Slurm...")
+		log.Infof("Collecting metrics from Slurm for host %s", sc.sshConfig.Host)
 		sc.trackedJobs = make(map[string]bool)
-		if sc.targetJobIds == "" {
-			sc.collectQueue()
-		} else {
+		if sc.targetJobIds != "" { //Collect user's job metrics
 			sc.collectAcct()
+		} else {
+			// sc.collectQueue() //Disable to collect metrics about all jobs
 		}
-		if !sc.skipInfra {
+		if !sc.skipInfra { //Collect infrastructure metrics
 			sc.collectInfo()
 		}
 		sc.lastScrape = time.Now()

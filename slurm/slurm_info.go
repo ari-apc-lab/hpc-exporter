@@ -59,7 +59,7 @@ const (
 )
 
 func (sc *SlurmCollector) collectInfo() {
-	log.Debugln("Collecting Info metrics...")
+	log.Debugln("Collecting partition metrics...")
 	var collected uint
 	var metricsAvailable bool = false
 
@@ -439,9 +439,9 @@ func (sc *SlurmCollector) collectInfo() {
 		}
 
 		collected = uint(len(sc.pMetrics["PartitionAvailable"]))
-		log.Infof("%d partition info collected", collected)
+		log.Infof("Metrics for %d partitions collected", collected)
 	} else {
-		log.Warnf("No metrics could be collected from host %s. Commands sinfo and squeue could not be available for user", sc.sshConfig.Host)
+		log.Warnf("No partition metrics could be collected from host %s. Commands sinfo and squeue could not be available for user", sc.sshConfig.Host)
 	}
 }
 

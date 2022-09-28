@@ -22,7 +22,7 @@ var (
 
 	logLevel = flag.String(
 		"log-level",
-		"error",
+		"info",
 		"Log level of the Application.",
 	)
 )
@@ -34,8 +34,8 @@ func main() {
 	if err == nil {
 		log.SetLevel(level)
 	} else {
-		log.SetLevel(log.WarnLevel)
-		log.Warnf("Log level %s not recognized, setting 'warn' as default.")
+		log.SetLevel(log.InfoLevel)
+		log.Warnf("Log level %s not recognized, setting 'info' as default.")
 	}
 
 	collectorStore := api.NewCollectorStore()
