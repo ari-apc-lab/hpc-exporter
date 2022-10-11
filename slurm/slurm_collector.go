@@ -163,9 +163,10 @@ type SlurmCollector struct {
 func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 
 	constLabels := make(prometheus.Labels)
-	constLabels["deployment_label"] = config.Deployment_label
+	constLabels["blueprint_id"] = config.Blueprint_id
 	constLabels["hpc"] = config.Hpc_label
-	constLabels["monitoring_id"] = config.Monitoring_id
+	constLabels["deployment_id"] = config.Deployment_id
+	constLabels["user"] = config.Iam_user
 
 	var metrics = map[string]PromMetricDesc{
 		"JobState":               {"slurm_job_state", "job current state", jobtags, constLabels, true},

@@ -52,18 +52,18 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		}
 	}
 
-	key := config.Monitoring_id + config.Host
+	key := config.Deployment_id + config.Host
 
 	s.Lock()
 	defer s.Unlock()
 
 	// TODO Add support for multiple collectors of the same type and the same monitoring_id (different hpc_label)
-	log.Infof("Creating collector for monitoring_id %s in host %s", config.Monitoring_id, config.Host)
+	log.Infof("Creating collector for monitoring_id %s in host %s", config.Deployment_id, config.Host)
 
 	switch sched := config.Scheduler; sched {
 	case "pbs":
 		if _, exists := s.storePBS[key]; exists {
-			log.Errorf("There is already a PBS collector for the provided monitoring_id %s and host %s", config.Monitoring_id, config.Host)
+			log.Errorf("There is already a PBS collector for the provided monitoring_id %s and host %s", config.Deployment_id, config.Host)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("There is already a PBS collector for the provided monitoring_id and host"))
 			return
@@ -74,7 +74,7 @@ func (s *HpcExporterStore) CreateHandler(w http.ResponseWriter, r *http.Request)
 		w.Write([]byte("Collector created"))
 	case "slurm":
 		if _, exists := s.storeSlurm[key]; exists {
-			log.Errorf("There is already a Slurm collector for the provided monitoring_id %s and host %s", config.Monitoring_id, config.Host)
+			log.Errorf("There is already a Slurm collector for the provided monitoring_id %s and host %s", config.Deployment_id, config.Host)
 			w.WriteHeader(http.StatusBadRequest)
 			w.Write([]byte("There is already a Slurm collector for the provided monitoring_id and host"))
 			return

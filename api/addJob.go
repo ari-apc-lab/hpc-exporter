@@ -35,7 +35,7 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
-	} else if config.Monitoring_id == "no_label" {
+	} else if config.Deployment_id == "no_label" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Need the Monitoring_id"))
 		return
@@ -55,8 +55,8 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 
 	s.Lock()
 	defer s.Unlock()
-	log.Infof("Adding job %s in host %s for monitoring_id %s", config.Job_id, config.Host, config.Monitoring_id)
-	key := config.Monitoring_id + config.Host
+	log.Infof("Adding job %s in host %s for monitoring_id %s", config.Job_id, config.Host, config.Deployment_id)
+	key := config.Deployment_id + config.Host
 
 	if collector, ok := s.storePBS[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)

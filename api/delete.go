@@ -38,7 +38,7 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if config.Monitoring_id == "no_label" {
+	if config.Deployment_id == "no_label" {
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte("Need the monitoring_id"))
 		return
@@ -50,8 +50,8 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Infof("Deleting collector for monitoring_id %s in host %s", config.Monitoring_id, config.Host)
-	key := config.Monitoring_id + config.Host
+	log.Infof("Deleting collector for monitoring_id %s in host %s", config.Deployment_id, config.Host)
+	key := config.Deployment_id + config.Host
 
 	if collector, ok := s.storePBS[key]; ok {
 		prometheus.Unregister(collector)
