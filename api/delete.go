@@ -40,7 +40,7 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 
 	if config.Deployment_id == "no_label" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Need the monitoring_id"))
+		w.Write([]byte("Need the deployment_id"))
 		return
 	}
 

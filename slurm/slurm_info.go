@@ -17,10 +17,10 @@ package slurm
 
 import (
 	"hpc_exporter/ssh"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
-	"regexp"
 
 	stats "github.com/montanaflynn/stats"
 	log "github.com/sirupsen/logrus"
@@ -511,13 +511,12 @@ func stringInSlice(a string, list []string) bool {
 	return false
 }
 
-
 // Remove non-alphabethical characters in partition name
 func processPartition(partition string) string {
 	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
 	var processedPartition = ""
-    if err == nil {
-    	processedPartition = reg.ReplaceAllString(partition, "")
+	if err == nil {
+		processedPartition = reg.ReplaceAllString(partition, "")
 	}
 	return processedPartition
 }

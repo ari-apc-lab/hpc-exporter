@@ -32,11 +32,17 @@ const (
 	accPARTITION
 	accSTATE
 	accNCPUS
+	accNNODES
 	accRESERVED
 	accELAPSED
 	accEXITCODE
-	accVMEM
-	accRSS
+	accCONSUMEDENERGY
+	accCPUTIME
+	accSUBMIT
+	accEND
+	accPRIORITY
+	accQOS
+	accTIMELIMIT
 	accFIELDS
 )
 
@@ -46,7 +52,7 @@ func (sc *SlurmCollector) collectAcct() {
 	var collected uint
 
 	startTime := getstarttime(sc.sacctHistory)
-	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,Reserved,ElapsedRaw,ExitCode,MaxVMSize,MaxRSS\" -p"
+	acctCommand := "sacct -n -X -o \"JobIDRaw,JobName,User,Partition,State,NCPUS,NNodes,Reserved,ElapsedRaw,ExitCode,ConsumedEnergyRaw,CPUTimeRaw,Submit,End,Priority,QoS,TimelimitRaw\" -p"
 
 	if sc.targetJobIds != "" {
 		acctCommand += " -j \"" + sc.targetJobIds + "\""
@@ -82,14 +88,21 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.jLabels["job_name"][jobid] = fields[accNAME]
 		sc.jLabels["job_user"][jobid] = fields[accUSERNAME]
 		sc.jLabels["job_partition"][jobid] = fields[accPARTITION]
+		sc.jLabels["job_priority"][jobid] = fields[accPRIORITY]
+		sc.jLabels["job_qos"][jobid] = fields[accQOS]
+		sc.jLabels["job_time_limit"][jobid] = fields[accTIMELIMIT]
+		sc.jLabels["job_submit_time"][jobid] = computeSlurmAcctTimeForLabel(fields[accSUBMIT])
+		sc.jLabels["job_end_time"][jobid] = computeSlurmAcctTimeForLabel(fields[accEND])
 
 		sc.jMetrics["JobState"][jobid] = float64(LongStatusDict[state])
-		sc.jMetrics["JobWalltime"][jobid], _ = strconv.ParseFloat(fields[accELAPSED], 64)
 		sc.jMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
-		sc.jMetrics["JobQueued"][jobid] = computeSlurmTime(fields[accRESERVED])
+		sc.jMetrics["JobNNodes"][jobid], _ = strconv.ParseFloat(fields[accNNODES], 64)
+		sc.jMetrics["JobConsumedEnergy"][jobid], _ = strconv.ParseFloat(fields[accCONSUMEDENERGY], 64)
+		sc.jMetrics["JobCPUTime"][jobid], _ = strconv.ParseFloat(fields[accCPUTIME], 64)
+		sc.jMetrics["JobElapsetime"][jobid], _ = strconv.ParseFloat(fields[accELAPSED], 64)
 		sc.jMetrics["JobExitCode"][jobid], sc.jMetrics["JobExitSignal"][jobid] = slurmExitCode(fields[accEXITCODE])
-		sc.jMetrics["JobVMEM"][jobid], _ = strconv.ParseFloat(fields[accVMEM], 64)
-		sc.jMetrics["JobRSS"][jobid] = parseMem(fields[accRSS])
+		sc.jMetrics["JobReserved"][jobid] = computeSlurmTime(fields[accRESERVED])
+
 		collected++
 		// Remove jobid from list of jobs (sc.JobIds) if state is one of terminating states (e.g. COMPLETED, FAILED)
 		if helper.ListContainsElement(SLURM_Terminating_States, state) {

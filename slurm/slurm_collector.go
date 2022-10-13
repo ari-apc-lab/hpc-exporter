@@ -118,11 +118,18 @@ var (
 	SLURM_Terminating_States = []string{"COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "BOOT_FAIL", "DEADLINE", "NODE_FAIL", "PREEMPTED"}
 )
 
+
+// Add list of tags used for job metric labels
 var jobtags = []string{
 	"job_id",
 	"job_name",
 	"job_user",
 	"job_partition",
+	"job_priority",
+	"job_qos",
+	"job_time_limit",
+	"job_submit_time",
+	"job_end_time",
 }
 
 var partitiontags = []string{
@@ -169,14 +176,16 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 	constLabels["user"] = config.Iam_user
 
 	var metrics = map[string]PromMetricDesc{
-		"JobState":               {"slurm_job_state", "job current state", jobtags, constLabels, true},
-		"JobWalltime":            {"slurm_job_walltime_used", "job current walltime", jobtags, constLabels, true},
-		"JobNCPUs":               {"slurm_job_cpu_n", "job ncpus assigned", jobtags, constLabels, true},
-		"JobVMEM":                {"slurm_job_memory_virtual_max", "job maximum virtual memory consumed", jobtags, constLabels, true},
-		"JobQueued":              {"slurm_job_queued", "job time in the queue", jobtags, constLabels, true},
-		"JobRSS":                 {"slurm_job_memory_physical_max", "job maximum Resident Set Size", jobtags, constLabels, true},
-		"JobExitCode":            {"slurm_job_exit_code", "job exit code", jobtags, constLabels, true},
-		"JobExitSignal":          {"slurm_job_exit_signal", "job exit signal that caused the exit code", jobtags, constLabels, true},
+		"JobState":          {"slurm_job_state", "job current state", jobtags, constLabels, true},
+		"JobNCPUs":          {"slurm_job_cpus", "job #cpus assigned", jobtags, constLabels, true},
+		"JobNNodes":         {"slurm_job_nodes", "job #nodes assigned", jobtags, constLabels, true},
+		"JobConsumedEnergy": {"slurm_job_consumed_energy", "total energy consumed by all tasks in job, in joules", jobtags, constLabels, true},
+		"JobCPUTime":        {"slurm_job_cpu_time", "time used (Elapsed time * CPU count) by a job or step in cpu-seconds", jobtags, constLabels, true},
+		"JobElapsetime":     {"slurm_job_elapsed_time", "job elapsed time", jobtags, constLabels, true},
+		"JobExitCode":       {"slurm_job_exit_code", "job exit code", jobtags, constLabels, true},
+		"JobExitSignal":     {"slurm_job_exit_signal", "signal producing the job exit code", jobtags, constLabels, true},
+		"JobReserved":       {"slurm_job_reserved", "How much wall clock time was used as reserved time for this job. This is derived from how long a job was waiting from eligible time to when it actually started", jobtags, constLabels, true},
+
 		"PartitionAvailable":     {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
 		"PartitionCores":         {"slurm_partition_cores", "partition average number of cores per socket", partitiontags, constLabels, false},
 		"PartitionCpus":          {"slurm_partition_cpus", "partition average number of cpus per node", partitiontags, constLabels, false},
@@ -334,6 +343,15 @@ func nextLineIterator(buf io.Reader, parser func(string) []string) func() ([]str
 			return nil, errors.New("not able to parse line")
 		}
 		return parsed, nil
+	}
+}
+
+func computeSlurmAcctTimeForLabel(timeField string) string {
+	// Converts format YYYY-MM-DDTHH:MM:SS to YYYY-MM-DD HH:MM:SS
+	if timeField == "" || timeField == "Unknown" {
+		return ""
+	} else {
+		return strings.Replace(timeField, "T", " ", 1)
 	}
 }
 

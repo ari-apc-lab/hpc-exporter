@@ -37,7 +37,7 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 		return
 	} else if config.Deployment_id == "no_label" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Need the Monitoring_id"))
+		w.Write([]byte("Need the deployment_id"))
 		return
 	}
 
