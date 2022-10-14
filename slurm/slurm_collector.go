@@ -118,7 +118,6 @@ var (
 	SLURM_Terminating_States = []string{"COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "BOOT_FAIL", "DEADLINE", "NODE_FAIL", "PREEMPTED"}
 )
 
-
 // Add list of tags used for job metric labels
 var jobtags = []string{
 	"job_id",
@@ -349,7 +348,7 @@ func nextLineIterator(buf io.Reader, parser func(string) []string) func() ([]str
 func computeSlurmAcctTimeForLabel(timeField string) string {
 	// Converts format YYYY-MM-DDTHH:MM:SS to YYYY-MM-DD HH:MM:SS
 	if timeField == "" || timeField == "Unknown" {
-		return ""
+		return "Unknown"
 	} else {
 		return strings.Replace(timeField, "T", " ", 1)
 	}
