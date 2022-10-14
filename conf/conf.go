@@ -15,6 +15,7 @@ type CollectorConfig struct {
 	Only_jobs       bool   `json:"only_jobs"`
 	Job_id          string `json:"job_id"`
 	Iam_user        string `json:"iam_user"`
+	Force			bool   `json:"force"`
 }
 
 func DefaultConfig() *CollectorConfig {
@@ -33,5 +34,6 @@ func DefaultConfig() *CollectorConfig {
 		Only_jobs:       false,
 		Job_id:          "",
 		Iam_user:        "",
+		Force:			 false,
 	}
 }

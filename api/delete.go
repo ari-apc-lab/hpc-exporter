@@ -50,13 +50,22 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	log.Infof("Deleting collector for monitoring_id %s in host %s", config.Deployment_id, config.Host)
 	key := config.Deployment_id + config.Host
 
 	if collector, ok := s.storePBS[key]; ok {
+		if (!config.Force && len(collector.JobIds) > 0){
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte("collector is still pending of monitoring jobs, wait for then to complete before deleting this collector"))
+			return
+		}
 		prometheus.Unregister(collector)
 		delete(s.storePBS, key)
 	} else if collector, ok := s.storeSlurm[key]; ok {
+		if (!config.Force && len(collector.JobIds) > 0){
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte("collector is still pending of monitoring jobs, wait for then to complete before deleting this collector"))
+			return
+		}
 		prometheus.Unregister(collector)
 		delete(s.storeSlurm, key)
 	} else {
@@ -65,6 +74,7 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	log.Infof("Deleted collector for deployment_id %s in host %s", config.Deployment_id, config.Host)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Collector deleted"))
 

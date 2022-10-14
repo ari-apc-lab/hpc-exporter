@@ -107,7 +107,9 @@ func (sc *SlurmCollector) collectAcct() {
 		collected++
 		// Remove jobid from list of jobs (sc.JobIds) if state is one of terminating states (e.g. COMPLETED, FAILED)
 		// and end time is collected
-		if helper.ListContainsElement(SLURM_Terminating_States, state) && strings.TrimSpace(end_time) != "Unknown"{
+		if helper.ListContainsElement(SLURM_Terminating_States, state) && strings.TrimSpace(end_time) != "Unknown" {
+			log.Infof("Job with id %s ending with state %d at time %s. Removed for list of jobs to monitor",
+				jobid, state, end_time)
 			sc.JobIds = helper.DeleteArrayEntry(sc.JobIds, jobid)
 		}
 	}
