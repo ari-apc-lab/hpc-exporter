@@ -128,7 +128,6 @@ var jobtags = []string{
 	"job_qos",
 	"job_time_limit",
 	"job_submit_time",
-	"job_end_time",
 }
 
 var partitiontags = []string{
@@ -184,6 +183,7 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		"JobExitCode":       {"slurm_job_exit_code", "job exit code", jobtags, constLabels, true},
 		"JobExitSignal":     {"slurm_job_exit_signal", "signal producing the job exit code", jobtags, constLabels, true},
 		"JobReserved":       {"slurm_job_reserved", "How much wall clock time was used as reserved time for this job. This is derived from how long a job was waiting from eligible time to when it actually started", jobtags, constLabels, true},
+		"JobEndTime":        {"slurm_end_time", "Termination time of the job", jobtags, constLabels, true},
 
 		"PartitionAvailable":     {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
 		"PartitionCores":         {"slurm_partition_cores", "partition average number of cores per socket", partitiontags, constLabels, false},
@@ -384,6 +384,15 @@ func computeSlurmTime(timeField string) float64 {
 
 	walltime := walltime_dd*86400.0 + walltime_hh*3600.0 + walltime_mm*60.0 + walltime_ss
 	return walltime
+}
+
+func computeSlurmDateTime(timeField string) float64 {
+	layout := "2006-01-02T15:04:05"
+	t, err := time.Parse(layout, timeField)
+	if err != nil {
+		fmt.Println("Error while parsing date :", err)
+	}
+	return float64(t.Unix())
 }
 
 func notContains(slice trackedList, s string) bool {

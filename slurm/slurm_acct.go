@@ -92,8 +92,7 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.jLabels["job_qos"][jobid] = fields[accQOS]
 		sc.jLabels["job_time_limit"][jobid] = fields[accTIMELIMIT]
 		sc.jLabels["job_submit_time"][jobid] = computeSlurmAcctTimeForLabel(fields[accSUBMIT])
-		end_time := fields[accEND]
-		sc.jLabels["job_end_time"][jobid] = computeSlurmAcctTimeForLabel(end_time)
+		
 
 		sc.jMetrics["JobState"][jobid] = float64(LongStatusDict[state])
 		sc.jMetrics["JobNCPUs"][jobid], _ = strconv.ParseFloat(fields[accNCPUS], 64)
@@ -103,12 +102,16 @@ func (sc *SlurmCollector) collectAcct() {
 		sc.jMetrics["JobElapsetime"][jobid], _ = strconv.ParseFloat(fields[accELAPSED], 64)
 		sc.jMetrics["JobExitCode"][jobid], sc.jMetrics["JobExitSignal"][jobid] = slurmExitCode(fields[accEXITCODE])
 		sc.jMetrics["JobReserved"][jobid] = computeSlurmTime(fields[accRESERVED])
+		end_time := fields[accEND]
+		if end_time != "Unknown" {
+			sc.jMetrics["JobEndTime"][jobid] = computeSlurmDateTime(end_time)
+		}
 
 		collected++
 		// Remove jobid from list of jobs (sc.JobIds) if state is one of terminating states (e.g. COMPLETED, FAILED)
 		// and end time is collected
 		if helper.ListContainsElement(SLURM_Terminating_States, state) && strings.TrimSpace(end_time) != "Unknown" {
-			log.Infof("Job with id %s ending with state %d at time %s. Removed for list of jobs to monitor",
+			log.Infof("Job with id %s ending with state %s at time %s. Removed for list of jobs to monitor",
 				jobid, state, end_time)
 			sc.JobIds = helper.DeleteArrayEntry(sc.JobIds, jobid)
 		}
