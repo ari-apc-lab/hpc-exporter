@@ -15,7 +15,7 @@ type CollectorConfig struct {
 	Only_jobs       bool   `json:"only_jobs"`
 	Job_id          string `json:"job_id"`
 	Iam_user        string `json:"iam_user"`
-	Force			bool   `json:"force"`
+	Force           bool   `json:"force"`
 }
 
 func DefaultConfig() *CollectorConfig {
@@ -28,12 +28,12 @@ func DefaultConfig() *CollectorConfig {
 		Private_key:     "",
 		Sacct_history:   5,
 		Scrape_interval: 15,
-		Blueprint_id:    "no_label",
-		Deployment_id:   "no_label",
-		Hpc_label:       "no_label",
+		Blueprint_id:    "",
+		Deployment_id:   "",
+		Hpc_label:       "",
 		Only_jobs:       false,
 		Job_id:          "",
 		Iam_user:        "",
-		Force:			 false,
+		Force:           false,
 	}
 }

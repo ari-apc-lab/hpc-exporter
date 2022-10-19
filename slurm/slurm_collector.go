@@ -162,7 +162,8 @@ type SlurmCollector struct {
 	mutex          *sync.Mutex
 	targetJobIds   string
 	JobIds         []string
-	skipInfra      bool
+	// skipInfra      bool
+	deployment_id  string
 }
 
 func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
@@ -232,7 +233,8 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		pLabels:        make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
 		JobIds:         []string{},
-		skipInfra:      config.Only_jobs,
+		//skipInfra:      config.Only_jobs,
+		deployment_id:  config.Deployment_id,
 	}
 
 	newerSlurmCollector.updateDynamicJobIds()
@@ -291,12 +293,10 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		defer sc.sshClient.Close()
 		log.Infof("Collecting metrics from Slurm for host %s", sc.sshConfig.Host)
 		sc.trackedJobs = make(map[string]bool)
-		if sc.targetJobIds != "" { //Collect user's job metrics
+		if sc.deployment_id != "" && sc.targetJobIds != "" { //Collect user's job metrics
 			sc.collectAcct()
-		} else {
-			// sc.collectQueue() //Disable to collect metrics about all jobs
 		}
-		if !sc.skipInfra { //Collect infrastructure metrics
+		if sc.deployment_id == "" { //Collect infrastructure metrics
 			sc.collectInfo()
 		}
 		sc.lastScrape = time.Now()
@@ -443,7 +443,7 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 			)
 		}
 	}
-	if !sc.skipInfra {
+	if sc.deployment_id == "" {
 		for metric, elem := range sc.pMetrics {
 
 			for partition, value := range elem {

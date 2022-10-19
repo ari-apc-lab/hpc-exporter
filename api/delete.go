@@ -38,44 +38,57 @@ func (s *HpcExporterStore) DeleteHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if config.Deployment_id == "no_label" {
+	if config.Deployment_id == "" && config.User == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Need the deployment_id"))
+		w.Write([]byte("Request does contain neither the deployment_id nor the HPC ssh user"))
 		return
 	}
 
 	if config.Host == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Need the Host"))
+		w.Write([]byte("Request does not contain the Host"))
 		return
 	}
 
-	key := config.Deployment_id + config.Host
+	// Setting collector key based on host (for infrastructure collectors) or deployment_id (for workflow collectors)
+	var key string
+	if config.Deployment_id != "" {
+		key = config.Deployment_id + "@" + config.Host
+	} else {
+		key = config.User + "@" + config.Host
+	}
 
 	if collector, ok := s.storePBS[key]; ok {
-		if (!config.Force && len(collector.JobIds) > 0){
+		if !config.Force && len(collector.JobIds) > 0 {
+			msg := fmt.Sprintf("collector %s is still pending of monitoring jobs, wait for then to complete before deleting this collector", key)
+			log.Info(msg)
 			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte("collector is still pending of monitoring jobs, wait for then to complete before deleting this collector"))
+			w.Write([]byte(msg))
 			return
 		}
 		prometheus.Unregister(collector)
 		delete(s.storePBS, key)
 	} else if collector, ok := s.storeSlurm[key]; ok {
-		if (!config.Force && len(collector.JobIds) > 0){
+		if !config.Force && len(collector.JobIds) > 0 {
+			msg := fmt.Sprintf("collector %s is still pending of monitoring jobs, wait for then to complete before deleting this collector", key)
+			log.Info(msg)
 			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte("collector is still pending of monitoring jobs, wait for then to complete before deleting this collector"))
+			w.Write([]byte(msg))
 			return
 		}
 		prometheus.Unregister(collector)
 		delete(s.storeSlurm, key)
 	} else {
+		msg := fmt.Sprintf("collector %s not found", key)
+		log.Error(msg)
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("monitoring_id not found"))
+		w.Write([]byte(msg))
 		return
 	}
 
-	log.Infof("Deleted collector for deployment_id %s in host %s", config.Deployment_id, config.Host)
+	msg := fmt.Sprintf("collector %s deleted", key)
+	log.Infof(msg)
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Collector deleted"))
+	w.Write([]byte(msg))
 
 }

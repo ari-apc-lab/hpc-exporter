@@ -35,36 +35,39 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(http.StatusBadRequest)
 		w.Write([]byte(err.Error()))
 		return
-	} else if config.Deployment_id == "no_label" {
+	} else if config.Deployment_id == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Need the deployment_id"))
+		w.Write([]byte("Request does not contain the deployment_id"))
 		return
 	}
 
 	if config.Job_id == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Need the Job_id"))
+		w.Write([]byte("Request does not contain the Job_id"))
 		return
 	}
 
 	if config.Host == "" {
 		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("Need the HPC Host"))
+		w.Write([]byte("Request does not contain the HPC Host"))
 		return
 	}
 
 	s.Lock()
 	defer s.Unlock()
 	log.Infof("Adding job %s in host %s for monitoring_id %s", config.Job_id, config.Host, config.Deployment_id)
-	key := config.Deployment_id + config.Host
+	key := config.Deployment_id + "@" + config.Host
 
 	if collector, ok := s.storePBS[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
 	} else if collector, ok := s.storeSlurm[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
 	} else {
+		msg := fmt.Sprintf("Request to add job %s failed. No collector found for host %s and monitoring_id %s ",
+			config.Job_id, config.Host, config.Deployment_id)
+		log.Info(msg)
 		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Combination of Host and Monitoring_id not found"))
+		w.Write([]byte(msg))
 		return
 	}
 
