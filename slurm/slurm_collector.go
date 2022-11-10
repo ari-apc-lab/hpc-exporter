@@ -300,11 +300,10 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 			sc.collectInfo()
 		}
 		sc.lastScrape = time.Now()
-		sc.delJobs()
-
 	}
 
 	sc.updateMetrics(ch)
+	sc.delCompletedJobs()
 }
 
 func getstarttime(days int) string {
@@ -462,7 +461,7 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 	}
 }
 
-func (sc *SlurmCollector) delJobs() {
+func (sc *SlurmCollector) delCompletedJobs() {
 	log.Debugf("Cleaning old jobs")
 	i := 0
 	for job, tracked := range sc.trackedJobs {

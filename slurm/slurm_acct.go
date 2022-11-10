@@ -114,6 +114,7 @@ func (sc *SlurmCollector) collectAcct() {
 			log.Infof("Job with id %s ending with state %s at time %s. Removed for list of jobs to monitor",
 				jobid, state, end_time)
 			sc.JobIds = helper.DeleteArrayEntry(sc.JobIds, jobid)
+			sc.trackedJobs[jobid] = false
 		}
 	}
 
