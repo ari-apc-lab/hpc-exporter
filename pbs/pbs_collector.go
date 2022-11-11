@@ -77,7 +77,7 @@ type PromMetricDesc struct {
 }
 type PBSCollector struct {
 	descPtrMap     map[string](*prometheus.Desc)
-	trackedJobs    map[string]bool
+	TrackedJobs    map[string]int
 	sshConfig      *ssh.SSHConfig
 	sshClient      *ssh.SSHClient
 	scrapeInterval int
@@ -136,7 +136,7 @@ func NewerPBSCollector(config *conf.CollectorConfig) *PBSCollector {
 	newerPBSCollector := &PBSCollector{
 		descPtrMap:     make(map[string](*prometheus.Desc)),
 		sshClient:      nil,
-		trackedJobs:    make(map[string]bool),
+		TrackedJobs:    make(map[string]int),
 		scrapeInterval: config.Scrape_interval,
 		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * config.Scrape_interval)))),
 		jMetrics:       make(map[string](map[string](float64))),
@@ -203,7 +203,7 @@ func (pc *PBSCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		defer pc.sshClient.Close()
 		log.Infof("Collecting metrics from PBS...")
-		pc.trackedJobs = make(map[string]bool)
+		pc.TrackedJobs = make(map[string]int)
 		if pc.targetJobIds != "" {
 			pc.collectJobs(ch)
 		}

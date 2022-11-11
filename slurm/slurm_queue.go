@@ -65,7 +65,7 @@ func (sc *SlurmCollector) collectQueue() {
 		if state == "RUNNING" || state == "COMPLETING" {
 			sc.runningJobs = append(sc.runningJobs, jobid)
 		} else {
-			sc.trackedJobs[jobid] = true
+			//sc.TrackedJobs[jobid] = true
 			sc.jLabels["job_id"][jobid] = jobid
 			sc.jLabels["job_name"][jobid] = fields[qNAME]
 			sc.jLabels["job_user"][jobid] = fields[qUSERNAME]

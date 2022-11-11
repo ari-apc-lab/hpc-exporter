@@ -60,8 +60,10 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 
 	if collector, ok := s.storePBS[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
+		collector.TrackedJobs[config.Job_id] = 5
 	} else if collector, ok := s.storeSlurm[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
+		collector.TrackedJobs[config.Job_id] = 5
 	} else {
 		msg := fmt.Sprintf("Request to add job %s failed. No collector found for host %s and monitoring_id %s ",
 			config.Job_id, config.Host, config.Deployment_id)
@@ -70,6 +72,7 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 		w.Write([]byte(msg))
 		return
 	}
+	
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Job ID added"))

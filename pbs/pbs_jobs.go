@@ -51,7 +51,7 @@ func (pc *PBSCollector) collectJobs(ch chan<- prometheus.Metric) {
 
 	for jobid, mapMetrics := range mapJobs {
 		if pc.targetJobIds == "" || strings.Contains(pc.targetJobIds, jobid) {
-			pc.trackedJobs[jobid] = true
+			//pc.TrackedJobs[jobid] = true
 			var startTime, createdTime time.Time
 			var state string
 			pc.clearjMetrics(jobid)

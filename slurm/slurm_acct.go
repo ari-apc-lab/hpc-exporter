@@ -83,7 +83,7 @@ func (sc *SlurmCollector) collectAcct() {
 			continue
 		}
 
-		sc.trackedJobs[jobid] = true
+		//sc.trackedJobs[jobid] = true
 		sc.jLabels["job_id"][jobid] = jobid
 		sc.jLabels["job_name"][jobid] = fields[accNAME]
 		sc.jLabels["job_user"][jobid] = fields[accUSERNAME]
@@ -113,8 +113,7 @@ func (sc *SlurmCollector) collectAcct() {
 		if helper.ListContainsElement(SLURM_Terminating_States, state) && strings.TrimSpace(end_time) != "Unknown" {
 			log.Infof("Job with id %s ending with state %s at time %s. Removed for list of jobs to monitor",
 				jobid, state, end_time)
-			sc.JobIds = helper.DeleteArrayEntry(sc.JobIds, jobid)
-			sc.trackedJobs[jobid] = false
+			sc.TrackedJobs[jobid]--
 		}
 	}
 

@@ -12,6 +12,7 @@ import (
 
 	"hpc_exporter/conf"
 	"hpc_exporter/ssh"
+	"hpc_exporter/helper"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -152,7 +153,7 @@ type SlurmCollector struct {
 	sshConfig      *ssh.SSHConfig
 	sshClient      *ssh.SSHClient
 	runningJobs    trackedList
-	trackedJobs    map[string]bool
+	TrackedJobs    map[string]int
 	scrapeInterval int
 	lastScrape     time.Time
 	jMetrics       map[string](map[string](float64))
@@ -224,7 +225,7 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		sacctHistory:   config.Sacct_history,
 		sshClient:      nil,
 		runningJobs:    make(trackedList, 0),
-		trackedJobs:    make(map[string]bool),
+		TrackedJobs:    make(map[string]int),
 		scrapeInterval: config.Scrape_interval,
 		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * config.Scrape_interval)))),
 		jMetrics:       make(map[string](map[string](float64))),
@@ -292,7 +293,7 @@ func (sc *SlurmCollector) Collect(ch chan<- prometheus.Metric) {
 		}
 		defer sc.sshClient.Close()
 		log.Infof("Collecting metrics from Slurm for host %s", sc.sshConfig.Host)
-		sc.trackedJobs = make(map[string]bool)
+		//sc.trackedJobs = make(map[string]int)
 		if sc.deployment_id != "" && sc.targetJobIds != "" { //Collect user's job metrics
 			sc.collectAcct()
 		}
@@ -464,8 +465,10 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 func (sc *SlurmCollector) delCompletedJobs() {
 	log.Debugf("Cleaning old jobs")
 	i := 0
-	for job, tracked := range sc.trackedJobs {
-		if !tracked {
+	for job, tracked := range sc.TrackedJobs {
+		if tracked == 0 {
+			sc.JobIds = helper.DeleteArrayEntry(sc.JobIds, job)
+			delete(sc.TrackedJobs, job)
 			for _, elems := range sc.jMetrics {
 				delete(elems, job)
 				i++
