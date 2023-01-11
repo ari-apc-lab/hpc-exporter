@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"hpc_exporter/conf"
-	"hpc_exporter/ssh"
 	"hpc_exporter/helper"
+	"hpc_exporter/ssh"
 
 	"github.com/prometheus/client_golang/prometheus"
 
@@ -135,6 +135,14 @@ var partitiontags = []string{
 	"partition",
 }
 
+var partitionjobtags = []string{
+	"job_id_hash",
+	"partition",
+	"priority",
+	"submit_time",
+	"time_limit",
+}
+
 type PromMetricDesc struct {
 	name               string
 	desc               string
@@ -158,13 +166,15 @@ type SlurmCollector struct {
 	lastScrape     time.Time
 	jMetrics       map[string](map[string](float64))
 	pMetrics       map[string](map[string](float64))
+	pjMetrics      map[string](map[string](float64))
 	jLabels        map[string](map[string](string))
 	pLabels        map[string](map[string](string))
+	pjLabels       map[string](map[string](string))
 	mutex          *sync.Mutex
 	targetJobIds   string
 	JobIds         []string
 	// skipInfra      bool
-	deployment_id  string
+	deployment_id string
 }
 
 func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
@@ -187,37 +197,50 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		"JobReserved":       {"slurm_job_reserved", "How much wall clock time was used as reserved time for this job. This is derived from how long a job was waiting from eligible time to when it actually started", jobtags, constLabels, true},
 		"JobEndTime":        {"slurm_end_time", "Termination time of the job", jobtags, constLabels, true},
 
-		"PartitionAvailable":     {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
-		"PartitionCores":         {"slurm_partition_cores", "partition average number of cores per socket", partitiontags, constLabels, false},
-		"PartitionCpus":          {"slurm_partition_cpus", "partition average number of cpus per node", partitiontags, constLabels, false},
-		"PartitionCpusLoadLower": {"slurm_partition_cpus_load_lower", "partition average lower CPU load", partitiontags, constLabels, false},
-		"PartitionCpusLoadUpper": {"slurm_partition_cpus_load_upper", "partition average upper CPU load", partitiontags, constLabels, false},
-		"PartitionAllocMem":      {"slurm_partition_alloc_mem", "partition average allocated memory in a node", partitiontags, constLabels, false},
-		"PartitionNodes":         {"slurm_partition_nodes", "partition total number of available nodes in partition", partitiontags, constLabels, false},
-		"PartitionFreeMemLower":  {"slurm_partition_free_mem_lower", "partition average lower free memory", partitiontags, constLabels, false},
-		"PartitionFreeMemUpper":  {"slurm_partition_free_mem_upper", "partition average upper free memory", partitiontags, constLabels, false},
-		"PartitionMemory":        {"slurm_partition_memory", "partition average memory size per node", partitiontags, constLabels, false},
-		"PartitionNodeAlloc":     {"slurm_partition_node_alloc", "partition total number of allocated nodes", partitiontags, constLabels, false},
-		"PartitionNodeIdle":      {"slurm_partition_node_idle", "partition total number of idle nodes ", partitiontags, constLabels, false},
-		"PartitionNodeOther":     {"slurm_partition_node_other", "partition total number of other nodes ", partitiontags, constLabels, false},
-		"PartitionNodeTotal":     {"slurm_partition_node_total", "partition total number of nodes ", partitiontags, constLabels, false},
-		"PartitionJobSizeLower":  {"slurm_partition_job_size_lower", "partition average minimun number of nodes that can be allocated by a job", partitiontags, constLabels, false},
-		"PartitionJobSizeUpper":  {"slurm_partition_job_size_upper", "partition average maximum number of nodes that can be allocated by a job", partitiontags, constLabels, false},
-		"PartitionTimeLimit":     {"slurm_partition_time_limit", "partition average time limit for any job", partitiontags, constLabels, false},
+		"PartitionAvailable":        {"slurm_partition_availability", "partition availability", partitiontags, constLabels, false},
+		"PartitionCores":            {"slurm_partition_cores", "partition average number of cores per socket", partitiontags, constLabels, false},
+		"PartitionCpus":             {"slurm_partition_cpus", "partition average number of cpus per node", partitiontags, constLabels, false},
+		"PartitionAvgCpusLoadLower": {"slurm_partition_avg_cpus_load_lower", "partition average lower CPU load", partitiontags, constLabels, false},
+		"PartitionAvgCpusLoadUpper": {"slurm_partition_avg_cpus_load_upper", "partition average upper CPU load", partitiontags, constLabels, false},
+		"PartitionAvgAllocMem":      {"slurm_partition_avg_alloc_mem", "partition average allocated memory in a node", partitiontags, constLabels, false},
+		"PartitionNodes":            {"slurm_partition_nodes", "partition total number of available nodes in partition", partitiontags, constLabels, false},
+		"PartitionAvgFreeMemLower":  {"slurm_partition_avg_free_mem_lower", "partition average lower free memory", partitiontags, constLabels, false},
+		"PartitionAvgFreeMemUpper":  {"slurm_partition_avg_free_mem_upper", "partition average upper free memory", partitiontags, constLabels, false},
+		"PartitionAvgMemory":        {"slurm_partition_avg_memory", "partition average memory size per node", partitiontags, constLabels, false},
+		"PartitionNodeAlloc":        {"slurm_partition_node_alloc", "partition total number of allocated nodes", partitiontags, constLabels, false},
+		"PartitionNodeIdle":         {"slurm_partition_node_idle", "partition total number of idle nodes ", partitiontags, constLabels, false},
+		"PartitionNodeOther":        {"slurm_partition_node_other", "partition total number of other nodes ", partitiontags, constLabels, false},
+		"PartitionNodeTotal":        {"slurm_partition_node_total", "partition total number of nodes ", partitiontags, constLabels, false},
+		"PartitionAvgJobSizeLower":  {"slurm_partition_avg_job_size_lower", "partition average minimun number of nodes that can be allocated by a job", partitiontags, constLabels, false},
+		"PartitionAvgJobSizeUpper":  {"slurm_partition_avg_job_size_upper", "partition average maximum number of nodes that can be allocated by a job", partitiontags, constLabels, false},
+		"PartitionAvgTimeLimit":     {"slurm_partition_avg_time_limit", "partition average time limit for any job", partitiontags, constLabels, false},
 
-		"PartitionRequestedCPUsPerJob":          {"slurm_partition_requested_cpus_per_job", "Average number of CPUs requested per job", partitiontags, constLabels, false},
-		"PartitionAllocatedCPUsPerJob":          {"slurm_partition_allocated_cpus_per_job", "Average number of CPUs allocated per job", partitiontags, constLabels, false},
-		"PartitionMinimumRequestedCPUsPerJob":   {"slurm_partition_minimum_requested_cpus_per_job", "Average minimum number of CPUs requested per job", partitiontags, constLabels, false},
-		"PartitionMaximumAllocatedCPUsPerJob":   {"slurm_partition_maximum_allocated_cpus_per_job", "Average maximum number of CPUs allocated per job", partitiontags, constLabels, false},
-		"PartitionMinimumRequestedNodesPerJob":  {"slurm_partition_minimum_requested_nodes_per_job", "Average minimum number of Nodes requested per job", partitiontags, constLabels, false},
-		"PartitionAllocatedNodesPerJob":         {"slurm_partition_allocated_nodes_per_job", "Average number of Nodes allocated per job", partitiontags, constLabels, false},
-		"PartitionMaximumAllocatedNodePerJob":   {"slurm_partition_maximum_allocated_nodes_per_job", "Average number of CPUs requested per job", partitiontags, constLabels, false},
-		"PartitionMinimumRequestedMemoryPerJob": {"slurm_partition_minimum_requested_memory_per_job", "Average number of CPUs requested per job", partitiontags, constLabels, false},
-		"PartitionQueueTimePerJob":              {"slurm_partition_queue_time_per_job", "Average queue time per job", partitiontags, constLabels, false},
-		"PartitionTimeLeftPerJob":               {"slurm_partition_time_left_per_job", "Average time left to exhaust maximum time per job", partitiontags, constLabels, false},
-		"PartitionExecutionTimePerJob":          {"slurm_partition_execution_time_per_job", "Average execution time per job", partitiontags, constLabels, false},
-		"PartitionRunningJobs":                  {"slurm_partition_running_jobs", "Number of running jobs in partition", partitiontags, constLabels, false},
-		"PartitionPendingJobs":                  {"slurm_partition_pending_jobs", "Number of pending jobs in partition", partitiontags, constLabels, false},
+		"PartitionAvgRequestedCPUsPerJob":          {"slurm_partition_avg_requested_cpus_per_job", "Average number of CPUs requested per job", partitiontags, constLabels, false},
+		"PartitionAvgAllocatedCPUsPerJob":          {"slurm_partition_avg_allocated_cpus_per_job", "Average number of CPUs allocated per job", partitiontags, constLabels, false},
+		"PartitionAvgMinimumRequestedCPUsPerJob":   {"slurm_partition_avg_minimum_requested_cpus_per_job", "Average minimum number of CPUs requested per job", partitiontags, constLabels, false},
+		"PartitionAvgMaximumAllocatedCPUsPerJob":   {"slurm_partition_avg_maximum_allocated_cpus_per_job", "Average maximum number of CPUs allocated per job", partitiontags, constLabels, false},
+		"PartitionAvgMinimumRequestedNodesPerJob":  {"slurm_partition_avg_minimum_requested_nodes_per_job", "Average minimum number of Nodes requested per job", partitiontags, constLabels, false},
+		"PartitionAvgAllocatedNodesPerJob":         {"slurm_partition_avg_allocated_nodes_per_job", "Average number of Nodes allocated per job", partitiontags, constLabels, false},
+		"PartitionAvgMaximumAllocatedNodePerJob":   {"slurm_partition_avg_maximum_allocated_nodes_per_job", "Average number of CPUs requested per job", partitiontags, constLabels, false},
+		"PartitionAvgMinimumRequestedMemoryPerJob": {"slurm_partition_avg_minimum_requested_memory_per_job", "Average number of CPUs requested per job", partitiontags, constLabels, false},
+		"PartitionAvgQueueTimePerJob":              {"slurm_partition_avg_queue_time_per_job", "Average queue time per job", partitiontags, constLabels, false},
+		"PartitionAvgTimeLeftPerJob":               {"slurm_partition_avg_time_left_per_job", "Average time left to exhaust maximum time per job", partitiontags, constLabels, false},
+		"PartitionAvgExecutionTimePerJob":          {"slurm_partition_avg_execution_time_per_job", "Average execution time per job", partitiontags, constLabels, false},
+		"PartitionRunningJobs":                     {"slurm_partition_avg_running_jobs", "Number of running jobs in partition", partitiontags, constLabels, false},
+		"PartitionPendingJobs":                     {"slurm_partition_avg_pending_jobs", "Number of pending jobs in partition", partitiontags, constLabels, false},
+
+		"PartitionJobState":                          {"slurm_partition_job_state", "Partition job state", partitionjobtags, constLabels, false},
+		"PartitionJobRequestedAllocatedCPUs":         {"slurm_partition_job_requested_allocated_cpus", "Number of CPUs requested/allocated by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobMinimumRequestedCPUs":           {"slurm_partition_job_minimum_requested_cpus", "Minimum number of CPUs requested by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobMaximumAllocatedCPUs":           {"slurm_partition_job_maximum_allocated_cpus", "Maximum number of CPUs allocated by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobAllocatedMinimumRequestedNodes": {"slurm_partition_job_allocated_minimum_requested_nodes", "Allocated/Minimum number of Nodes requested by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobMaximumAllocatedNode":           {"slurm_partition_job_maximum_allocated_nodes", "Number of CPUs requested by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobMinimumRequestedMemory":         {"slurm_partition_job_minimum_requested_memory", "Number of CPUs requested by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobQueueTime":                      {"slurm_partition_job_queue_time", "Queue time by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobTimeLeft":                       {"slurm_partition_job_time_left", "Time left to exhaust maximum time by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobExecutionTime":                  {"slurm_partition_job_execution_time", "Execution time by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobExecutionStartTime":             {"slurm_partition_job_start_time", "Start time by partition job", partitionjobtags, constLabels, false},
+		"PartitionJobExecutionEndTime":               {"slurm_partition_job_end_time", "End time by partition job", partitionjobtags, constLabels, false},
 	}
 
 	newerSlurmCollector := &SlurmCollector{
@@ -230,12 +253,14 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		lastScrape:     time.Now().Add(time.Second * (time.Duration((-2 * config.Scrape_interval)))),
 		jMetrics:       make(map[string](map[string](float64))),
 		pMetrics:       make(map[string](map[string](float64))),
+		pjMetrics:      make(map[string](map[string](float64))),
 		jLabels:        make(map[string](map[string](string))),
 		pLabels:        make(map[string](map[string](string))),
+		pjLabels:       make(map[string](map[string](string))),
 		mutex:          &sync.Mutex{},
 		JobIds:         []string{},
 		//skipInfra:      config.Only_jobs,
-		deployment_id:  config.Deployment_id,
+		deployment_id: config.Deployment_id,
 	}
 
 	newerSlurmCollector.updateDynamicJobIds()
@@ -253,6 +278,7 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 			newerSlurmCollector.jMetrics[key] = make(map[string]float64)
 		} else {
 			newerSlurmCollector.pMetrics[key] = make(map[string]float64)
+			newerSlurmCollector.pjMetrics[key] = make(map[string]float64)
 		}
 	}
 
@@ -262,6 +288,10 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 
 	for _, label := range partitiontags {
 		newerSlurmCollector.pLabels[label] = make(map[string]string)
+	}
+
+	for _, label := range partitionjobtags {
+		newerSlurmCollector.pjLabels[label] = make(map[string]string)
 	}
 
 	return newerSlurmCollector
@@ -387,6 +417,9 @@ func computeSlurmTime(timeField string) float64 {
 }
 
 func computeSlurmDateTime(timeField string) float64 {
+	if timeField == "N/A" {
+		return -1.0
+	}
 	layout := "2006-01-02T15:04:05"
 	t, err := time.Parse(layout, timeField)
 	if err != nil {
@@ -450,6 +483,22 @@ func (sc *SlurmCollector) updateMetrics(ch chan<- prometheus.Metric) {
 				labels := make([]string, len(sc.pLabels))
 				for i, key := range partitiontags {
 					labels[i] = sc.pLabels[key][partition]
+				}
+				ch <- prometheus.MustNewConstMetric(
+					sc.descPtrMap[metric],
+					prometheus.GaugeValue,
+					value,
+					labels...,
+				)
+			}
+		}
+
+		for metric, elem := range sc.pjMetrics {
+
+			for partition, value := range elem {
+				labels := make([]string, len(sc.pjLabels))
+				for i, key := range partitionjobtags {
+					labels[i] = sc.pjLabels[key][partition]
 				}
 				ch <- prometheus.MustNewConstMetric(
 					sc.descPtrMap[metric],
