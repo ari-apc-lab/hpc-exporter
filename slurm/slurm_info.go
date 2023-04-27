@@ -442,16 +442,22 @@ func (sc *SlurmCollector) collectPartitionJobMetricsUsingSQueue(partitionJobMetr
 		job_id := fields[qsqeJOBID]
 		sc.pjLabels["job_id_hash"][job_id] = computeHash(job_id)
 		sc.pjLabels["partition"][job_id] = fields[qsqePARTITION]
-		sc.pjLabels["priority"][job_id] = fields[qsqePRIORITY]
 		sc.pjLabels["submit_time"][job_id] = fields[qsqeSUBMITTIME]
 		sc.pjLabels["time_limit"][job_id] = fields[qsqeTIMELIMIT]
 
 		// Job State (Pending|Running)
-		state := 0.0
+		state := 0.0 // PENDING
 		if fields[qsqSTATE] == "RUNNING" {
 			state = 1.0
 		}
 		partitionJobMetrics["PartitionJobState"][job_id] = state
+
+		// Priority
+		var priority, _ = strconv.ParseFloat(fields[qsqePRIORITY], 64)
+		_, mapContainsKeyPartitionJobPriority := partitionJobMetrics["PartitionJobPriority"][job_id]
+		if !mapContainsKeyPartitionJobPriority {
+			partitionJobMetrics["PartitionJobPriority"][job_id] = priority
+		}
 
 		// Number of CPUS requested/allocated for job
 		var cpus, _ = strconv.ParseFloat(fields[qsqeNUMCPUS], 64)
@@ -511,6 +517,7 @@ func (sc *SlurmCollector) collectPartitionJobMetricsUsingSQueue(partitionJobMetr
 		}
 
 		// Execution time for job
+		// Parse time (day-hours:minute:second)
 		time = parseTime(fields[qsqeUSEDTIME])
 		_, mapContainsKeyPartitionExecutionTimePerJob := partitionJobMetrics["PartitionJobExecutionTime"][job_id]
 		if !mapContainsKeyPartitionExecutionTimePerJob {
@@ -607,9 +614,12 @@ func (sc *SlurmCollector) collectInfo() {
 		}
 
 		// Metrics for jobs in partition
+		// FIXME Reset sc.pjMetrics before assign new values
+		sc.resetPartitionJobs()
+
 		for metric, metricMap := range partitionJobMetrics {
-			for partition, value := range metricMap {
-				sc.pjMetrics[metric][partition] = value
+			for jobid, value := range metricMap {
+				sc.pjMetrics[metric][jobid] = value
 			}
 		}
 
@@ -652,7 +662,8 @@ func parseTime(sTime string) float64 {
 	if len(sremain) > 2 {
 		seconds, _ = strconv.ParseFloat(sremain[2], 64)
 	}
-	return days*24*60*60 + hours*60*60 + minutes*60 + seconds
+	conversion := days*24*60*60 + hours*60*60 + minutes*60 + seconds
+	return conversion
 }
 
 func sinfoLineParser(line string) []string {

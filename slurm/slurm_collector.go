@@ -125,7 +125,6 @@ var jobtags = []string{
 	"job_name",
 	"job_user",
 	"job_partition",
-	"job_priority",
 	"job_qos",
 	"job_time_limit",
 	"job_submit_time",
@@ -138,7 +137,6 @@ var partitiontags = []string{
 var partitionjobtags = []string{
 	"job_id_hash",
 	"partition",
-	"priority",
 	"submit_time",
 	"time_limit",
 }
@@ -230,6 +228,7 @@ func NewerSlurmCollector(config *conf.CollectorConfig) *SlurmCollector {
 		"PartitionPendingJobs":                     {"slurm_partition_avg_pending_jobs", "Number of pending jobs in partition", partitiontags, constLabels, false},
 
 		"PartitionJobState":                          {"slurm_partition_job_state", "Partition job state", partitionjobtags, constLabels, false},
+		"PartitionJobPriority":                       {"slurm_partition_job_priority", "Partition job priority", partitionjobtags, constLabels, false},
 		"PartitionJobRequestedAllocatedCPUs":         {"slurm_partition_job_requested_allocated_cpus", "Number of CPUs requested/allocated by partition job", partitionjobtags, constLabels, false},
 		"PartitionJobMinimumRequestedCPUs":           {"slurm_partition_job_minimum_requested_cpus", "Minimum number of CPUs requested by partition job", partitionjobtags, constLabels, false},
 		"PartitionJobMaximumAllocatedCPUs":           {"slurm_partition_job_maximum_allocated_cpus", "Maximum number of CPUs allocated by partition job", partitionjobtags, constLabels, false},
@@ -526,6 +525,14 @@ func (sc *SlurmCollector) delCompletedJobs() {
 	}
 	log.Debugf("%d old jobs deleted", i)
 }
+
+func (sc *SlurmCollector) resetPartitionJobs(){
+	log.Debugf("Restoring collected partition jobs")
+	for metric, _ := range sc.pjMetrics {
+		sc.pjMetrics[metric] = make(map[string]float64)
+	}
+}
+
 
 func (sc *SlurmCollector) updateDynamicJobIds() {
 
