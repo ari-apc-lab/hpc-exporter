@@ -60,7 +60,7 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 
 	if collector, ok := s.storePBS[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
-		collector.TrackedJobs[config.Job_id] = 5
+		collector.TrackedJobs[config.Job_id] = 5 //Set to number of monitor scrapes to wait to collect metrics after job termination
 	} else if collector, ok := s.storeSlurm[key]; ok {
 		collector.JobIds = append(collector.JobIds, config.Job_id)
 		collector.TrackedJobs[config.Job_id] = 5
@@ -72,7 +72,6 @@ func (s *HpcExporterStore) AddJobHandler(w http.ResponseWriter, r *http.Request)
 		w.Write([]byte(msg))
 		return
 	}
-	
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Job ID added"))

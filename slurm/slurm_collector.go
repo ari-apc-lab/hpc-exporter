@@ -125,6 +125,7 @@ var jobtags = []string{
 	"job_name",
 	"job_user",
 	"job_partition",
+	"job_priority",
 	"job_qos",
 	"job_time_limit",
 	"job_submit_time",
